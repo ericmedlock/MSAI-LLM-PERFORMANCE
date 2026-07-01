@@ -35,17 +35,36 @@ def build_backend(
     raise ValueError(f"unknown backend {name!r}; expected one of {BACKEND_NAMES}")
 
 
-def build_ollama_client(config: Config, environment: str | None = None) -> LLMClient:
-    """Build the pinned Ollama client for an environment. Imported lazily so
-    offline tests never require the concrete HTTP client."""
-    from backends.llm_client import OllamaClient
+def build_client(config: Config, environment: str | None = None) -> LLMClient:
+    """Build the LLM client for an environment, selected by provider.
 
-    env = config.env(environment)
-    return OllamaClient(
-        endpoint=env.ollama_endpoint,
-        model_tag=config.model.tag,
-        temperature=config.decoding.temperature,
-        num_ctx=config.decoding.num_ctx,
-        max_tokens=config.decoding.max_tokens,
-        seed=config.decoding.seed,
-    )
+    Endpoint/provider/model/key are resolved with per-machine ``.env``
+    overrides applied; the pinned decoding parameters come from config.
+    Concrete HTTP clients are imported lazily so offline tests never need them.
+    """
+    env = config.env(environment).resolved()
+    decoding = config.decoding
+    if env.provider == "ollama":
+        from backends.llm_client import OllamaClient
+
+        return OllamaClient(
+            endpoint=env.base_url,
+            model_tag=env.model,
+            temperature=decoding.temperature,
+            num_ctx=decoding.num_ctx,
+            max_tokens=decoding.max_tokens,
+            seed=decoding.seed,
+        )
+    if env.provider in ("openai", "openai-compatible", "lmstudio"):
+        from backends.llm_client import OpenAICompatibleClient
+
+        return OpenAICompatibleClient(
+            base_url=env.base_url,
+            model_tag=env.model,
+            temperature=decoding.temperature,
+            num_ctx=decoding.num_ctx,
+            max_tokens=decoding.max_tokens,
+            seed=decoding.seed,
+            api_key=env.api_key(),
+        )
+    raise ValueError(f"unknown provider {env.provider!r} for environment {env.key!r}")

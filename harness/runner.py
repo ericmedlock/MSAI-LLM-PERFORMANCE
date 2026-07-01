@@ -71,7 +71,7 @@ class Runner:
 
     def run_plan(self, plan: RunPlan, output_path: str | Path) -> int:
         """Execute a plan, appending rows. Returns the number of NEW rows written."""
-        env = self._config.env(plan.environment)
+        env = self._config.env(plan.environment).resolved()
         done = completed_keys(output_path)
         backends = self._build_backends(plan.backends)
         written = 0
@@ -84,7 +84,7 @@ class Runner:
                     if key in done:
                         continue
                     record = self._execute_one(
-                        backend, task, plan.environment, env.runtime, trial_idx
+                        backend, task, plan.environment, env, trial_idx
                     )
                     append_record(output_path, record)
                     written += 1
@@ -95,10 +95,10 @@ class Runner:
         backend: Backend,
         task: Task,
         environment: str,
-        runtime: str,
+        env,
         trial_idx: int,
     ) -> RunRecord:
-        collector = self._collector_factory(runtime)
+        collector = self._collector_factory(env.runtime)
         collector.start()
         error_category: Optional[str] = None
         try:
@@ -136,6 +136,8 @@ class Runner:
             trial_idx=trial_idx,
             model_tag=self._config.model.tag,
             config_hash=self._config.config_hash,
+            provider=env.provider,
+            provider_model_id=env.model,
             answer=answer,
             correct=correct,
             error_category=error_category,

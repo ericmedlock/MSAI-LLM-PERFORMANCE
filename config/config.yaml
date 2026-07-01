@@ -11,9 +11,12 @@
 active_environment: local
 
 model:
-  tag: "deepseek-r1:14b"          # Ollama tag, pinned
+  # Canonical (provider-independent) identity of the pinned model. Each
+  # environment maps this to its own provider-specific id below; both are
+  # recorded on every telemetry row so cells stay comparable.
+  tag: "deepseek-r1-14b-distill-q4_k_m"
   quantization: "Q4_K_M"
-  digest: ""                       # fill from `ollama show deepseek-r1:14b` at freeze
+  digest: ""                       # fill from the serving runtime at freeze
 
 decoding:
   temperature: 0.0                 # pinned for determinism (see pre-reg S5 tension)
@@ -38,14 +41,27 @@ architectures:
     # entry 2026-07-01 in PRE_REGISTRATION.md.
     peer_seed_strategy: offset     # offset | same
 
+# Per-environment serving config. `provider` selects the client:
+#   openai  -> OpenAI-compatible server (LM Studio, vLLM, llama.cpp)
+#   ollama  -> native Ollama /api/chat
+# `model` is the provider-specific model id. Any of provider/base_url/model/
+# api_key can be overridden per-machine (without editing this committed file)
+# via a .env file -- see .env.example. Endpoints/keys are machine-specific and
+# belong in .env; the pinned science stays here.
 environments:
   local:
-    name: "Apple M5 Max (48GB, Metal)"
-    ollama_endpoint: "http://localhost:11434"
+    name: "Apple M5 Max (48GB, Metal) — LM Studio"
+    provider: openai
+    base_url: "http://localhost:1234/v1"
+    model: "deepseek-r1-distill-qwen-14b"   # LM Studio model id
+    api_key_env: LLM_API_KEY                 # optional; LM Studio ignores the value
     runtime: metal
   cloud:
-    name: "Azure GPU VM (Ubuntu, CUDA)"
-    ollama_endpoint: "http://localhost:11434"
+    name: "Azure GPU VM (Ubuntu, CUDA) — Ollama"
+    provider: ollama
+    base_url: "http://localhost:11434"
+    model: "deepseek-r1:14b"                 # Ollama tag
+    api_key_env: LLM_API_KEY
     runtime: cuda
 
 tasks_manifest: "tasks/manifest.json"

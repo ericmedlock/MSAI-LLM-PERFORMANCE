@@ -13,7 +13,8 @@ produced it.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -52,8 +53,31 @@ class SwarmConfig:
 class EnvironmentConfig:
     key: str
     name: str
-    ollama_endpoint: str
-    runtime: str  # "metal" | "cuda" | "cpu"
+    provider: str        # "openai" (LM Studio/vLLM) | "ollama"
+    base_url: str        # includes /v1 for openai provider
+    model: str           # provider-specific model id
+    runtime: str         # "metal" | "cuda" | "cpu"
+    api_key_env: str = "LLM_API_KEY"
+
+    def resolved(self, environ: dict[str, str] | None = None) -> "EnvironmentConfig":
+        """Apply per-machine overrides from the environment (.env → os.environ).
+
+        Endpoints, provider, model id, and the API key legitimately differ
+        between machines and must not be baked into the committed config, so
+        ``LLM_PROVIDER`` / ``LLM_BASE_URL`` / ``LLM_MODEL`` override here when
+        set. Pinned scientific parameters are never overridable this way.
+        """
+        environ = os.environ if environ is None else environ
+        return replace(
+            self,
+            provider=environ.get("LLM_PROVIDER", self.provider),
+            base_url=environ.get("LLM_BASE_URL", self.base_url),
+            model=environ.get("LLM_MODEL", self.model),
+        )
+
+    def api_key(self, environ: dict[str, str] | None = None) -> str:
+        environ = os.environ if environ is None else environ
+        return environ.get(self.api_key_env, "lm-studio")
 
 
 @dataclass(frozen=True)
@@ -80,6 +104,30 @@ class Config:
         return self.environments[key]
 
 
+def load_dotenv(path: str | Path = ".env", *, override: bool = False) -> dict[str, str]:
+    """Minimal ``.env`` loader (no third-party dependency).
+
+    Populates ``os.environ`` from ``KEY=VALUE`` lines (``#`` comments and
+    blank lines ignored; surrounding quotes stripped). Existing environment
+    variables win unless ``override`` is set. Returns the parsed pairs.
+    """
+    p = Path(path)
+    parsed: dict[str, str] = {}
+    if not p.exists():
+        return parsed
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        parsed[key] = value
+        if override or key not in os.environ:
+            os.environ[key] = value
+    return parsed
+
+
 def _require(mapping: dict[str, Any], *keys: str) -> Any:
     node: Any = mapping
     for k in keys:
@@ -99,8 +147,11 @@ def load_config(path: str | Path) -> Config:
         environments[key] = EnvironmentConfig(
             key=key,
             name=env["name"],
-            ollama_endpoint=env["ollama_endpoint"],
+            provider=env["provider"],
+            base_url=env["base_url"],
+            model=env["model"],
             runtime=env["runtime"],
+            api_key_env=env.get("api_key_env", "LLM_API_KEY"),
         )
 
     active = _require(data, "active_environment")

@@ -32,7 +32,7 @@ class RunRecord:
     task_id: str
     task_domain: str
     trial_idx: int
-    model_tag: str
+    model_tag: str            # canonical, provider-independent model identity
     config_hash: str
     # outcome
     answer: str
@@ -45,6 +45,9 @@ class RunRecord:
     total_tokens: int
     tokens_per_s: Optional[float]
     action_count: int
+    # serving provenance (what actually produced this row)
+    provider: str = ""            # "openai" | "ollama"
+    provider_model_id: str = ""   # provider-specific model id actually requested
     # telemetry + backend extras
     telemetry: dict = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)

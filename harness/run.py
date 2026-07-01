@@ -11,8 +11,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from backends.factory import BACKEND_NAMES, build_ollama_client
-from harness.config import load_config
+from backends.factory import BACKEND_NAMES, build_client
+from harness.config import load_config, load_dotenv
 from harness.prompts import load_prompts
 from harness.runner import RunPlan, Runner
 from harness.task_loader import load_tasks
@@ -48,6 +48,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
+    load_dotenv()  # per-machine endpoint/provider/model/key overrides
     config = load_config(args.config)
     prompts = load_prompts(config.prompts_dir)
     all_tasks = load_tasks(config.tasks_manifest)
@@ -70,8 +71,10 @@ def main(argv: list[str] | None = None) -> int:
     plan = RunPlan(environment=environment, backends=backends, tasks=tasks, trials=trials)
 
     total = len(tasks) * len(backends) * trials
-    print(f"Environment : {environment} ({config.env(environment).name})")
-    print(f"Model       : {config.model.tag} ({config.model.quantization})")
+    env = config.env(environment).resolved()
+    print(f"Environment : {environment} ({env.name})")
+    print(f"Provider    : {env.provider} @ {env.base_url}")
+    print(f"Model       : {env.model}  [canonical: {config.model.tag} {config.model.quantization}]")
     print(f"Backends    : {', '.join(backends)}")
     print(f"Tasks       : {len(tasks)}  ({', '.join(t.task_id for t in tasks)})")
     print(f"Trials (N)  : {trials}")
@@ -81,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n[dry-run] not calling the model.")
         return 0
 
-    client = build_ollama_client(config, environment)
+    client = build_client(config, environment)
     runner = Runner(config=config, client=client, prompts=prompts)
     written = runner.run_plan(plan, output)
     print(f"\nDone. Wrote {written} new row(s); {total - written} already present.")
