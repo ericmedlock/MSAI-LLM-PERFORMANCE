@@ -16,6 +16,9 @@ psutil==7.2.2
 # pynvml is CUDA-only; installed on the Azure VM (see requirements-cuda.txt),
 # not on Apple Silicon. The harness imports it defensively.
 
+# --- analysis (Pareto charts; report itself is stdlib-only) ---
+matplotlib==3.11.0
+
 # --- testing ---
 pytest==9.1.1
 pytest-cov==7.1.0
