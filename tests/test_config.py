@@ -13,7 +13,7 @@ def test_pinned_values_match_preregistration(config):
     assert config.model.quantization == "Q4_K_M"
     assert config.decoding.temperature == 0.0          # determinism
     assert config.decoding.num_ctx == 8192
-    assert config.decoding.max_tokens == 2048
+    assert config.decoding.max_tokens == 6144  # raised from 2048; see Amendment Log
     assert config.trials_n == 5
     assert config.agentic.max_loops == 2
     assert config.swarm.num_agents == 3

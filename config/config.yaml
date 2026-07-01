@@ -21,7 +21,10 @@ model:
 decoding:
   temperature: 0.0                 # pinned for determinism (see pre-reg S5 tension)
   num_ctx: 8192                    # fixed context window
-  max_tokens: 2048                 # fixed max output tokens (Ollama num_predict)
+  max_tokens: 6144                 # fixed max output tokens; raised from 2048 —
+                                   # DeepSeek-R1's chain-of-thought exhausted 2048
+                                   # on code tasks before emitting any code (see
+                                   # Amendment Log 2026-07-01). Held constant across cells.
   seed: 42                         # fixed seed -> reproducible sampling
 
 trials:
