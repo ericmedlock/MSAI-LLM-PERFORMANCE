@@ -36,7 +36,33 @@ scripts/                  # env snapshot + Azure provisioning
 tests/                    # offline pytest suite (no model, no GPU, no network)
 ```
 
-## Quick start (Apple M5 Max — local cell)
+## Model server (provider) configuration
+
+The client layer is provider-agnostic. Each environment in
+[`config/config.yaml`](config/config.yaml) selects a `provider`:
+
+| provider | server | endpoint style | telemetry |
+| --- | --- | --- | --- |
+| `openai` | **LM Studio** (current local), vLLM, llama.cpp | `POST {base_url}/chat/completions`, `base_url` ends in `/v1` | Metal (no GPU power) |
+| `ollama` | Ollama (Azure cloud cell) | `POST {base_url}/api/chat` | CUDA (`pynvml`) |
+
+Endpoints, provider, model id, and API key are **machine-specific**, so they
+can be overridden per box via a `.env` file (gitignored) without touching the
+committed config — copy [`.env.example`](.env.example) to `.env` and edit.
+Pinned scientific parameters (temperature, N, topologies, …) live only in
+config.yaml and are **not** overridable via `.env`. Every row records both the
+canonical `model_tag` and the `provider`/`provider_model_id` that actually
+served it.
+
+```bash
+# Overrides (optional). Defaults already target LM Studio on this machine.
+cp .env.example .env
+#   LLM_PROVIDER=openai
+#   LLM_BASE_URL=http://localhost:1234/v1
+#   LLM_MODEL=deepseek-r1-distill-qwen-14b
+```
+
+## Quick start (Apple M5 Max — local cell, LM Studio)
 
 ```bash
 # 1. Python env (note: a broken `python3` alias may exist; use an explicit interpreter)
@@ -45,14 +71,17 @@ python3.13 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 
 # 2. Offline smoke test — verifies structure without touching a model
-./.venv/bin/python -m pytest -q
+./.venv/bin/python -m pytest -m "not integration" -q
 
-# 3. Install Ollama + pull the pinned model (for real runs)
-#    https://ollama.com/download  (macOS, Metal backend)
-ollama pull deepseek-r1:14b
-ollama show deepseek-r1:14b        # copy the digest into config.yaml `model.digest`
+# 3. In LM Studio: load `deepseek-r1-distill-qwen-14b` (Q4_K_M) and start the
+#    local server (Developer tab → Start Server, default port 1234). Set the
+#    model's context length to match config `decoding.num_ctx` (8192) — the
+#    OpenAI API cannot set it per-request.
 
-# 4. Record an environment snapshot (commit alongside results)
+# 4. Live check against LM Studio (skips automatically if the server is down)
+./.venv/bin/python -m pytest -m integration -rs
+
+# 5. Record an environment snapshot (commit alongside results)
 ./.venv/bin/python scripts/env_snapshot.py > results/env_local_$(date +%Y%m%d).json
 ```
 

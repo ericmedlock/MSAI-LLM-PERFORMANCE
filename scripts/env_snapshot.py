@@ -31,24 +31,36 @@ def _pip_freeze() -> list[str]:
         return []
 
 
-def _ollama_model_digest(endpoint: str, tag: str) -> str | None:
+def _model_fingerprint(provider: str, base_url: str, model: str) -> str | None:
+    """Best-effort proof the pinned model is actually loaded/available.
+
+    Ollama exposes a content digest via /api/show; OpenAI-compatible servers
+    (LM Studio) only confirm presence via /v1/models.
+    """
     try:
         import requests
 
-        resp = requests.post(f"{endpoint}/api/show", json={"name": tag}, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("details", {}).get("digest") or data.get("digest")
+        if provider == "ollama":
+            resp = requests.post(f"{base_url}/api/show", json={"name": model}, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("details", {}).get("digest") or data.get("digest")
+        else:  # openai-compatible
+            resp = requests.get(f"{base_url}/models", timeout=10)
+            if resp.status_code == 200:
+                ids = [m.get("id") for m in resp.json().get("data", [])]
+                return f"present={model in ids}"
     except Exception:
         return None
     return None
 
 
 def main() -> int:
-    from harness.config import load_config
+    from harness.config import load_config, load_dotenv
 
+    load_dotenv()
     config = load_config(ROOT / "config" / "config.yaml")
-    env = config.env()
+    env = config.env().resolved()
     snapshot = {
         "platform": platform.platform(),
         "processor": platform.processor(),
@@ -56,10 +68,13 @@ def main() -> int:
         "active_environment": config.active_environment,
         "environment_name": env.name,
         "runtime": env.runtime,
+        "provider": env.provider,
+        "base_url": env.base_url,
         "model_tag": config.model.tag,
+        "provider_model_id": env.model,
         "model_quantization": config.model.quantization,
         "model_digest_pinned": config.model.digest or None,
-        "model_digest_live": _ollama_model_digest(env.ollama_endpoint, config.model.tag),
+        "model_fingerprint_live": _model_fingerprint(env.provider, env.base_url, env.model),
         "config_hash": config.config_hash,
         "pip_freeze": _pip_freeze(),
     }

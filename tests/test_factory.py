@@ -6,8 +6,8 @@ from __future__ import annotations
 import pytest
 
 from backends.agentic import AgenticBackend
-from backends.factory import build_backend, build_ollama_client
-from backends.llm_client import OllamaClient
+from backends.factory import build_backend, build_client
+from backends.llm_client import OllamaClient, OpenAICompatibleClient
 from backends.monolithic import MonolithicBackend
 from backends.swarm import SwarmBackend
 from tests.conftest import FakeLLMClient
@@ -29,14 +29,35 @@ def test_unknown_backend_rejected(config, prompts):
         build_backend("mixture", client=FakeLLMClient(), config=config, prompts=prompts)
 
 
-def test_ollama_client_carries_pinned_params(config):
-    client = build_ollama_client(config, "cloud")
-    assert isinstance(client, OllamaClient)
-    assert client.model_tag == config.model.tag
-    assert client.temperature == 0.0
-    assert client.num_ctx == config.decoding.num_ctx
+def test_build_client_selects_openai_for_lmstudio_local(config, monkeypatch):
+    for var in ("LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL"):
+        monkeypatch.delenv(var, raising=False)
+    client = build_client(config, "local")
+    assert isinstance(client, OpenAICompatibleClient)
+    assert client.base_url == "http://localhost:1234/v1"
+    assert client.model_tag == "deepseek-r1-distill-qwen-14b"
+    assert client.temperature == 0.0                      # pinned, not overridable
+    assert client.max_tokens == config.decoding.max_tokens
     assert client.seed == config.decoding.seed
-    assert client.endpoint == config.env("cloud").ollama_endpoint.rstrip("/")
+
+
+def test_build_client_selects_ollama_for_cloud(config, monkeypatch):
+    for var in ("LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL"):
+        monkeypatch.delenv(var, raising=False)
+    client = build_client(config, "cloud")
+    assert isinstance(client, OllamaClient)
+    assert client.endpoint == "http://localhost:11434"
+    assert client.model_tag == "deepseek-r1:14b"
+
+
+def test_build_client_honors_dotenv_override(config, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("LLM_BASE_URL", "http://otherbox:11434")
+    monkeypatch.setenv("LLM_MODEL", "qwen2.5:14b")
+    client = build_client(config, "local")  # local is openai in config...
+    assert isinstance(client, OllamaClient)  # ...but .env flips it to ollama
+    assert client.endpoint == "http://otherbox:11434"
+    assert client.model_tag == "qwen2.5:14b"
 
 
 def test_swarm_same_seed_strategy_disables_offset(prompts):

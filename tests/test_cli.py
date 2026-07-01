@@ -11,7 +11,8 @@ def test_dry_run_reports_plan_and_does_not_call_model(capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "dry-run" in out
-    assert "deepseek-r1:14b" in out
+    assert "Provider    : openai @ http://localhost:1234/v1" in out  # LM Studio
+    assert "deepseek-r1-distill-qwen-14b" in out
     assert "Total cells : 5 runs" in out
 
 

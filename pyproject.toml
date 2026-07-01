@@ -16,8 +16,10 @@ packages = ["backends", "harness"]
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "integration: hits a live model server (LM Studio / Ollama); skipped when unreachable",
+]
 
 [tool.coverage.run]
 branch = true
 source = ["backends", "harness"]
-omit = ["backends/llm_client.py"]  # exercised only against a live Ollama server
