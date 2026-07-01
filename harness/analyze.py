@@ -50,7 +50,16 @@ def main(argv: list[str] | None = None) -> int:
     if judge_rows:
         records = join_judge(records, judge_rows)
 
-    report = build_report(records)
+    import json as _json
+
+    host_profiles = []
+    for hp in sorted(glob.glob("results/host/*.json")):
+        try:
+            host_profiles.append(_json.loads(Path(hp).read_text(encoding="utf-8")))
+        except Exception:
+            pass
+
+    report = build_report(records, host_profiles)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report, encoding="utf-8")

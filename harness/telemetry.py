@@ -56,6 +56,7 @@ class _SamplingCollector:
         self._thread: Optional[threading.Thread] = None
         self._proc = psutil.Process()
         self._peak_ram_mb = 0.0
+        self._peak_sys_used_mb = 0.0
         self._cpu_samples: list[float] = []
         self._extra_start()
 
@@ -73,6 +74,12 @@ class _SamplingCollector:
         while not self._stop.is_set():
             rss_mb = self._proc.memory_info().rss / (1024 * 1024)
             self._peak_ram_mb = max(self._peak_ram_mb, rss_mb)
+            # System-wide memory: with an out-of-process model server (LM Studio),
+            # the model's footprint is NOT in this harness's RSS, so we also track
+            # whole-system used memory to reflect the real footprint.
+            self._peak_sys_used_mb = max(
+                self._peak_sys_used_mb, psutil.virtual_memory().used / (1024 * 1024)
+            )
             self._cpu_samples.append(psutil.cpu_percent(interval=None))
             self._extra_sample()
             time.sleep(self._interval)
@@ -89,7 +96,8 @@ class _SamplingCollector:
         avg_cpu = sum(self._cpu_samples) / len(self._cpu_samples) if self._cpu_samples else None
         result = {
             "runtime": self.runtime,
-            "peak_ram_mb": round(self._peak_ram_mb, 1),
+            "peak_ram_mb": round(self._peak_ram_mb, 1),          # harness process only
+            "peak_sys_used_mb": round(self._peak_sys_used_mb, 1),  # whole system (incl. model server)
             "avg_cpu_pct": round(avg_cpu, 1) if avg_cpu is not None else None,
             "samples": len(self._cpu_samples),
         }

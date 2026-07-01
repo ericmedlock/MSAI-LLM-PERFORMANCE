@@ -192,6 +192,14 @@ cell, a heavier judge, and model-family generalization.
 - Agentic/swarm use role-specific prompts that **differ** from monolithic —
   documented, not hidden.
 - Raw per-run telemetry is committed so all figures are replayable.
+- **Hardware provenance**: each run auto-writes `results/host/<env>.json` (chip,
+  total RAM, total VRAM, GPU, OS, provider + backend/judge models, config hash);
+  the analysis report prints it. Capture on demand with
+  `python scripts/hardware_snapshot.py`.
+- Per-row memory: `peak_ram_mb` is the **harness process** only; with an
+  out-of-process server (LM Studio) the model's footprint is in
+  `peak_sys_used_mb` (whole-system) instead. Total installed RAM/VRAM live in
+  the host profile.
 
 ## Swarm independent-sample seeding (resolved → Amendment Log 2026-07-01)
 

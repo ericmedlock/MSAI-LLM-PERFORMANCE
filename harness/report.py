@@ -42,7 +42,7 @@ def _agg_rows(summaries: list[CellSummary], label_keys: tuple[str, ...]) -> list
     return rows
 
 
-def build_report(records: list[dict]) -> str:
+def build_report(records: list[dict], host_profiles: list[dict] | None = None) -> str:
     if not records:
         return "# Analysis\n\n_No result rows found._\n"
 
@@ -56,6 +56,16 @@ def build_report(records: list[dict]) -> str:
         f"- Runs: **{n}**  ·  Environments: **{', '.join(map(str, environments))}**  "
         f"·  Model: **{', '.join(map(str, models))}**"
     )
+    for hp in host_profiles or []:
+        hw = hp.get("hardware", {})
+        out.append(
+            f"- Host (`{hp.get('environment')}`): **{hw.get('chip')}**, "
+            f"{hw.get('total_ram_gb')} GB RAM"
+            + (f" (unified/VRAM {hw.get('total_vram_gb')} GB)" if hw.get('unified_memory')
+               else f", GPU {hw.get('gpu_model')} {hw.get('total_vram_gb')} GB VRAM")
+            + f", {hp.get('os')} · serving {hp.get('serving', {}).get('provider')} "
+            f"`{hp.get('serving', {}).get('backend_model')}`"
+        )
     out.append(
         "- Every metric is mean±std across trials (pre-reg S9). "
         "Pareto: minimize latency/tokens, maximize accuracy.\n"

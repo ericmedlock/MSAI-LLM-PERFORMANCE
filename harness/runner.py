@@ -63,6 +63,27 @@ class Runner:
         self._clock = clock or _time.time
         self._run_id_factory = run_id_factory or (lambda: uuid.uuid4().hex)
 
+    def _write_host_profile(self, env) -> None:
+        """Capture the static host/hardware/model profile once per run."""
+        import json
+        from pathlib import Path
+
+        from harness.hostinfo import collect_host_profile
+
+        profile = collect_host_profile(
+            environment=env.key,
+            runtime=env.runtime,
+            provider=env.provider,
+            base_url=env.base_url,
+            backend_model=env.model,
+            judge_model=self._config.judge.model,
+            config_hash=self._config.config_hash,
+            timestamp=_now_iso(self._clock),
+        )
+        out = Path(self._config.results_dir) / "host" / f"{env.key}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+
     def _build_backends(self, names: Iterable[str]) -> dict[str, Backend]:
         return {
             n: build_backend(n, client=self._client, config=self._config, prompts=self._prompts)
@@ -72,6 +93,7 @@ class Runner:
     def run_plan(self, plan: RunPlan, output_path: str | Path) -> int:
         """Execute a plan, appending rows. Returns the number of NEW rows written."""
         env = self._config.env(plan.environment).resolved()
+        self._write_host_profile(env)
         done = completed_keys(output_path)
         backends = self._build_backends(plan.backends)
         written = 0

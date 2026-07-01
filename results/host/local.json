@@ -1,0 +1,47 @@
+{
+  "host_id": "3bb388800afb",
+  "hostname": "Erics-MacBook-Air.local",
+  "environment": "local",
+  "runtime": "metal",
+  "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "python": "3.13.11",
+  "hardware": {
+    "chip": "Apple M5 Max",
+    "machine_model": "Mac17,6",
+    "cpu_cores": 18,
+    "total_ram_gb": 48,
+    "gpu_model": "Apple M5 Max",
+    "gpu_cores": "40",
+    "total_vram_gb": 48,
+    "unified_memory": true
+  },
+  "serving": {
+    "provider": "openai",
+    "base_url": "http://localhost:1234/v1",
+    "backend_model": "foo-14b",
+    "judge_model": "llama-3.2-3b-instruct",
+    "models_available": [
+      "qwen/qwen3.6-35b-a3b",
+      "deepseek-r1-distill-qwen-14b",
+      "qwen/qwen3-coder-30b",
+      "liquid/lfm2-24b-a2b",
+      "google/gemma-4-31b",
+      "nomic-embed-code",
+      "deepseek-r1-distill-qwen-32b",
+      "qwen/qwen3.6-27b",
+      "qwen/qwen3.5-9b",
+      "deepseek/deepseek-r1-0528-qwen3-8b",
+      "google/gemma-4-e4b",
+      "nvidia/nemotron-3-nano-4b",
+      "qwen2.5-3b-instruct",
+      "qwen3-4b-dnd",
+      "qwen/qwen3-vl-4b",
+      "qwen/qwen2.5-vl-7b",
+      "llama-3.2-3b-instruct",
+      "phi-3-mini-4k-instruct",
+      "text-embedding-nomic-embed-text-v1.5"
+    ]
+  },
+  "config_hash": "dc043df42821d85d",
+  "captured_at": "2023-11-14T22:13:20+00:00"
+}
