@@ -42,6 +42,30 @@ def test_each_peer_gets_only_the_task_no_controller(prompts):
     assert all(u == GSM.prompt for u in seen_users)
 
 
+def test_unparseable_peers_cannot_win_the_vote(prompts):
+    # 1 peer gives a real number, 2 ramble with no extractable number.
+    # The 2 abstainers must NOT form a winning "" group; the real answer wins.
+    answers = {0: "the answer is 72", 1: "hmm let me think about it", 2: "well it depends"}
+    client = FakeLLMClient(lambda s, u, seed: answers[seed - 42])
+    result = SwarmBackend(
+        client, prompts, num_agents=3, tie_break="lowest_agent_index", base_seed=42
+    ).run(GSM)
+    assert result.answer == "the answer is 72"
+    assert result.metadata["winning_key"] == "72"
+    assert result.metadata["abstained"] == 2
+    assert result.metadata["all_abstained"] is False
+
+
+def test_all_peers_unparseable_flags_coordination_failure(prompts):
+    client = FakeLLMClient(lambda s, u, seed: "no idea, sorry")
+    result = SwarmBackend(
+        client, prompts, num_agents=3, tie_break="lowest_agent_index", base_seed=42
+    ).run(GSM)
+    assert result.metadata["all_abstained"] is True     # visible in analysis
+    assert result.metadata["abstained"] == 3
+    assert result.metadata["chosen_peer_index"] == 0    # best-effort fallback
+
+
 def test_peers_use_offset_seeds_for_reproducible_diversity(prompts):
     seeds = []
     client = FakeLLMClient(lambda s, u, seed: (seeds.append(seed) or "answer 72"))
