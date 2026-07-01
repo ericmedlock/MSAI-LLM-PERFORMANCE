@@ -63,12 +63,14 @@ class Runner:
         self._clock = clock or _time.time
         self._run_id_factory = run_id_factory or (lambda: uuid.uuid4().hex)
 
-    def _write_host_profile(self, env) -> None:
-        """Capture the static host/hardware/model profile once per run."""
+    def _write_host_profile(self, env) -> tuple[str, str]:
+        """Capture the static host profile once per run: write the full JSON
+        sidecar, merge the normalized hosts.csv, and return (host_id, label)
+        to stamp inline on every row."""
         import json
         from pathlib import Path
 
-        from harness.hostinfo import collect_host_profile
+        from harness.hostinfo import collect_host_profile, compact_label, write_hosts_csv
 
         profile = collect_host_profile(
             environment=env.key,
@@ -80,9 +82,12 @@ class Runner:
             config_hash=self._config.config_hash,
             timestamp=_now_iso(self._clock),
         )
-        out = Path(self._config.results_dir) / "host" / f"{env.key}.json"
+        results_dir = Path(self._config.results_dir)
+        out = results_dir / "host" / f"{env.key}.json"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+        write_hosts_csv([profile], results_dir / "hosts.csv")
+        return profile["host_id"], compact_label(profile)
 
     def _build_backends(self, names: Iterable[str]) -> dict[str, Backend]:
         return {
@@ -93,7 +98,7 @@ class Runner:
     def run_plan(self, plan: RunPlan, output_path: str | Path) -> int:
         """Execute a plan, appending rows. Returns the number of NEW rows written."""
         env = self._config.env(plan.environment).resolved()
-        self._write_host_profile(env)
+        self._host_id, self._host_label = self._write_host_profile(env)
         done = completed_keys(output_path)
         backends = self._build_backends(plan.backends)
         written = 0
@@ -160,6 +165,8 @@ class Runner:
             config_hash=self._config.config_hash,
             provider=env.provider,
             provider_model_id=env.model,
+            host_id=getattr(self, "_host_id", ""),
+            host=getattr(self, "_host_label", ""),
             answer=answer,
             correct=correct,
             error_category=error_category,

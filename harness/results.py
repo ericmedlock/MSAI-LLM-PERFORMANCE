@@ -48,6 +48,8 @@ class RunRecord:
     # serving provenance (what actually produced this row)
     provider: str = ""            # "openai" | "ollama"
     provider_model_id: str = ""   # provider-specific model id actually requested
+    host_id: str = ""             # stable key -> hosts.csv / results/host/<env>.json
+    host: str = ""                # compact inline label: "chip | RAM | runtime"
     # telemetry + backend extras
     telemetry: dict = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)

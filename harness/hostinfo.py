@@ -103,6 +103,61 @@ def _loaded_models(provider: str, base_url: str) -> Optional[list[str]]:
     return None
 
 
+def compact_label(profile: dict) -> str:
+    """Short, human-readable hardware label stamped inline on every result row."""
+    hw = profile.get("hardware", {})
+    mem = f"{hw.get('total_ram_gb')}GB {'unified' if hw.get('unified_memory') else 'RAM'}"
+    return f"{hw.get('chip')} | {mem} | {profile.get('runtime')}"
+
+
+# columns for the normalized hosts dimension table (results/hosts.csv)
+HOSTS_CSV_COLUMNS = [
+    "host_id", "hostname", "environment", "runtime", "chip", "machine_model",
+    "cpu_cores", "total_ram_gb", "gpu_model", "gpu_cores", "total_vram_gb",
+    "unified_memory", "os", "python", "provider", "base_url", "backend_model",
+    "judge_model", "config_hash",
+]
+
+
+def profile_to_row(profile: dict) -> dict:
+    """Flatten a host profile into a single hosts.csv row."""
+    hw = profile.get("hardware", {})
+    sv = profile.get("serving", {})
+    flat = {
+        "host_id": profile.get("host_id"), "hostname": profile.get("hostname"),
+        "environment": profile.get("environment"), "runtime": profile.get("runtime"),
+        "os": profile.get("os"), "python": profile.get("python"),
+        "config_hash": profile.get("config_hash"),
+        "provider": sv.get("provider"), "base_url": sv.get("base_url"),
+        "backend_model": sv.get("backend_model"), "judge_model": sv.get("judge_model"),
+    }
+    for k in ("chip", "machine_model", "cpu_cores", "total_ram_gb", "gpu_model",
+              "gpu_cores", "total_vram_gb", "unified_memory"):
+        flat[k] = hw.get(k)
+    return {c: flat.get(c) for c in HOSTS_CSV_COLUMNS}
+
+
+def write_hosts_csv(profiles: list[dict], path) -> None:
+    """Write/merge host profiles into a normalized hosts.csv (dedup by host_id)."""
+    import csv
+    from pathlib import Path
+
+    p = Path(path)
+    rows: dict[str, dict] = {}
+    if p.exists():  # merge with any existing table
+        for r in csv.DictReader(p.open(encoding="utf-8")):
+            rows[r["host_id"]] = r
+    for prof in profiles:
+        row = profile_to_row(prof)
+        rows[row["host_id"]] = row
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=HOSTS_CSV_COLUMNS)
+        w.writeheader()
+        for row in rows.values():
+            w.writerow(row)
+
+
 def collect_host_profile(
     *,
     environment: str,
