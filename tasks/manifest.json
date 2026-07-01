@@ -1,7 +1,8 @@
 {
   "_comment": "Frozen benchmark items. 3 per domain = 9 total, per PRE_REGISTRATION.md S7. Grading is binary and fully automated. 'source_id' records provenance; items marked id_status=PLACEHOLDER_PENDING_FREEZE carry real, correctly-graded content transcribed from the public benchmark but their exact upstream split/index is confirmed and frozen at pilot time (pre-reg allows freezing after pilot). Do not edit after freeze except via the Amendment Log.",
-  "frozen": false,
-  "frozen_on": null,
+  "frozen": true,
+  "frozen_on": "2026-07-01",
+  "freeze_note": "15-item task set locked for the study (5 per domain). Items carry real, correctly-graded content; per-item id_status records that exact upstream benchmark indices are transcribed, not yet cross-verified against the source split. Do not add, remove, or edit items after this date except via the PRE_REGISTRATION.md Amendment Log.",
   "tasks": [
     {
       "task_id": "gsm8k-001",
