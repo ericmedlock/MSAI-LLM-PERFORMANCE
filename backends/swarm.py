@@ -118,13 +118,28 @@ class SwarmBackend(Backend):
     def _majority_vote(self, domain: str, peers: list[_PeerOut]) -> tuple[str, dict]:
         ordered = sorted(peers, key=lambda p: p["index"])  # deterministic
         keys = [vote_key(domain, p["answer"]) for p in ordered]
-        counts = Counter(keys)
-        top = max(counts.values())
-        winners = {k for k, c in counts.items() if c == top}
-        # tie-break: lowest_agent_index -> earliest peer in any winning group
-        chosen = next(p for p, k in zip(ordered, keys) if k in winners)
+        # A peer whose answer has no extractable value (empty vote key) ABSTAINS:
+        # it must not be able to win the vote. Otherwise all unparseable peers
+        # collapse into one "" group that can outnumber the real answers and the
+        # swarm would return garbage over a genuine majority.
+        valid = [(p, k) for p, k in zip(ordered, keys) if k != ""]
+        counts = Counter(k for _, k in valid)
+        if counts:
+            top = max(counts.values())
+            winners = {k for k, c in counts.items() if c == top}
+            # tie-break: lowest_agent_index -> earliest VALID peer in a winning group
+            chosen = next(p for p, k in valid if k in winners)
+            all_abstained = False
+        else:
+            # every peer failed to produce a parseable answer -> best effort,
+            # flagged so it is visible in analysis (a coordination/format failure)
+            chosen = ordered[0]
+            winners = set()
+            all_abstained = True
         return chosen["answer"], {
             "vote_counts": dict(counts),
+            "abstained": sum(1 for k in keys if k == ""),
+            "all_abstained": all_abstained,
             "winning_key": vote_key(domain, chosen["answer"]),
             "tie": len(winners) > 1,
             "chosen_peer_index": chosen["index"],
