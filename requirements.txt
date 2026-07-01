@@ -1,0 +1,22 @@
+# Pinned runtime + test dependencies (see README for how to regenerate).
+# Captured from a working install on 2026-07-01, Python 3.13.
+
+# --- orchestration ---
+langgraph==0.3.34
+langgraph-checkpoint==2.1.2
+langgraph-sdk==0.1.74
+langchain-core==0.3.86
+
+# --- config / IO / model transport ---
+PyYAML==6.0.3
+requests==2.34.2
+
+# --- telemetry ---
+psutil==7.2.2
+# pynvml is CUDA-only; installed on the Azure VM (see requirements-cuda.txt),
+# not on Apple Silicon. The harness imports it defensively.
+
+# --- testing ---
+pytest==9.1.1
+pytest-cov==7.1.0
+coverage==7.14.3
