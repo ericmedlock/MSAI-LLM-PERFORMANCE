@@ -31,6 +31,12 @@ architectures:
     num_agents: 3                  # parallel peers
     aggregation: majority_vote
     tie_break: lowest_agent_index  # fixed rule: on a tie, take earliest peer's answer
+    # Per-peer decoding seed. `offset` -> peer i draws with (seed + i) so the
+    # peers are independent samples (required by pre-reg S2's "independent
+    # samples" premise, which a single shared seed at temperature 0.0 would
+    # violate). `same` -> all peers share the pinned seed. See Amendment Log
+    # entry 2026-07-01 in PRE_REGISTRATION.md.
+    peer_seed_strategy: offset     # offset | same
 
 environments:
   local:

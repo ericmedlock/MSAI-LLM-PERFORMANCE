@@ -45,6 +45,7 @@ class SwarmConfig:
     num_agents: int
     aggregation: str
     tie_break: str
+    peer_seed_strategy: str  # "offset" | "same"
 
 
 @dataclass(frozen=True)
@@ -126,6 +127,7 @@ def load_config(path: str | Path) -> Config:
             num_agents=int(_require(data, "architectures", "swarm", "num_agents")),
             aggregation=_require(data, "architectures", "swarm", "aggregation"),
             tie_break=_require(data, "architectures", "swarm", "tie_break"),
+            peer_seed_strategy=_require(data, "architectures", "swarm", "peer_seed_strategy"),
         ),
         environments=environments,
         trials_n=int(_require(data, "trials", "n")),

@@ -19,6 +19,7 @@ def test_pinned_values_match_preregistration(config):
     assert config.swarm.num_agents == 3
     assert config.swarm.aggregation == "majority_vote"
     assert config.swarm.tie_break == "lowest_agent_index"
+    assert config.swarm.peer_seed_strategy == "offset"  # amended 2026-07-01
 
 
 def test_both_environments_defined(config):

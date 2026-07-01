@@ -20,6 +20,8 @@ def test_build_each_backend_type(config, prompts):
     assert isinstance(a, AgenticBackend) and a._max_loops == config.agentic.max_loops
     s = build_backend("swarm", client=client, config=config, prompts=prompts)
     assert isinstance(s, SwarmBackend) and s._num_agents == config.swarm.num_agents
+    # peer-seed strategy is pinned in config, not a code default (amended 2026-07-01)
+    assert s._peer_seed_strategy == config.swarm.peer_seed_strategy
 
 
 def test_unknown_backend_rejected(config, prompts):

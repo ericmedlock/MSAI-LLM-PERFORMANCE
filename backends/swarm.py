@@ -11,11 +11,13 @@ Design commitments (pre-reg S6, and the build brief):
   with a fixed tie-break (``lowest_agent_index``). The aggregator does no
   reasoning and calls no model.
 
-DECISION FLAGGED FOR ADVISOR (not in pre-reg): with temperature 0.0 a single
-shared seed makes all peers identical, so majority vote is degenerate. Peers
-therefore draw with ``seed = base_seed + peer_index`` (reproducible but
-diverse). Toggle via config ``swarm.peer_seed_strategy``. Log to the
-Amendment Log once confirmed.
+Independent-sample seeding (pre-reg Amendment Log, 2026-07-01): the
+pre-registration (S2) treats the swarm as aggregating *independent samples*
+by majority vote. Under the pinned temperature 0.0 a single shared seed makes
+all peers deterministically identical, so the vote would be degenerate and
+that premise would not hold. Peers therefore draw with
+``seed = base_seed + peer_index`` (``swarm.peer_seed_strategy: offset`` in
+config) -- diverse yet fully reproducible. ``same`` restores the shared seed.
 """
 
 from __future__ import annotations

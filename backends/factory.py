@@ -30,6 +30,7 @@ def build_backend(
             num_agents=config.swarm.num_agents,
             tie_break=config.swarm.tie_break,
             base_seed=config.decoding.seed,
+            peer_seed_strategy=config.swarm.peer_seed_strategy,
         )
     raise ValueError(f"unknown backend {name!r}; expected one of {BACKEND_NAMES}")
 

@@ -162,6 +162,9 @@ swarm designs; results are specific to it.
 Amendment Log
 Any deviation from the above after 2026-07-01 07:31 EDT is recorded here with date,
 change, and rationale.
-Date Change Rationale
-— — —
+
+| Date | Change | Rationale |
+| --- | --- | --- |
+| 2026-07-01 (post-lock, pre-data) | Swarm peers draw with a per-peer decoding seed offset: peer *i* uses `seed = base_seed + i` (pinned as `architectures.swarm.peer_seed_strategy: offset` in config.yaml). Monolithic and agentic backends are unaffected and keep the single pinned seed. No runs had been executed at the time of this amendment. | S2 pre-registers the swarm as improving accuracy by aggregating **independent samples** via majority vote. Under the pinned temperature 0.0, a single shared seed makes all three peers deterministically identical, collapsing the vote and voiding the "independent samples" premise the hypothesis rests on. Fixed per-peer offsets restore genuine sample diversity while remaining fully reproducible (all seeds fixed and version-controlled). Made solo; revisit if the advisor prefers temp>0 with a shared seed as the diversity source instead. Toggle back with `peer_seed_strategy: same`. |
+
 5

@@ -132,9 +132,14 @@ the respective hardware.
   documented, not hidden.
 - Raw per-run telemetry is committed so all figures are replayable.
 
-## Flagged decision (needs advisor sign-off → Amendment Log)
+## Swarm independent-sample seeding (resolved → Amendment Log 2026-07-01)
 
-With `temperature=0.0`, a single shared seed makes all swarm peers identical
-and majority vote degenerate. Peers therefore draw with
-`seed = base_seed + peer_index` (reproducible but diverse). Toggle via
-`swarm.peer_seed_strategy` in code. Confirm and log in `PRE_REGISTRATION.md`.
+The pre-registration (§2) treats the swarm as aggregating **independent
+samples** by majority vote. Under the pinned `temperature=0.0`, a single
+shared seed would make all three peers deterministically identical and the
+vote degenerate — voiding that premise. Peers therefore draw with
+`seed = base_seed + peer_index`, pinned in config as
+`architectures.swarm.peer_seed_strategy: offset` (set to `same` to restore a
+shared seed). This is recorded in the `PRE_REGISTRATION.md` Amendment Log;
+raise with the advisor whether `temp>0` with a shared seed is preferred as
+the diversity source instead.
