@@ -69,12 +69,16 @@ environments:
 # stays the PRIMARY metric (pre-reg S7); the judge adds a graded-quality score
 # and an independent correctness opinion. The judge model is deliberately a
 # DIFFERENT FAMILY from the backend (backend = Qwen-based DeepSeek-R1 distill;
-# judge = Gemma) to avoid a model rewarding its own family. Overridable via
+# judge = Llama) to avoid a model rewarding its own family. Overridable via
 # JUDGE_PROVIDER / JUDGE_BASE_URL / JUDGE_MODEL in .env.
+# NOTE: a heavier judge (e.g. google/gemma-4-31b) grades the quality scale more
+# reliably but was too slow to load on the M5 Max in testing; llama-3.2-3b is
+# fast and reliable for the CORRECT/INCORRECT verdict, though its 0-4 quality
+# score is noisier. Swap up when a bigger judge is practical.
 judge:
   provider: openai
   base_url: "http://localhost:1234/v1"
-  model: "google/gemma-4-31b"
+  model: "llama-3.2-3b-instruct"
   max_score: 4                     # quality scale 0..4
   prompt_file: "prompts/judge/system.txt"
 
