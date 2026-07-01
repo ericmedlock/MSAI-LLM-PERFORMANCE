@@ -10,13 +10,13 @@ from harness.task_loader import load_tasks
 from tests.conftest import ROOT
 
 
-def test_loads_nine_frozen_tasks_three_per_domain():
+def test_loads_frozen_tasks_evenly_across_domains():
     tasks = load_tasks(ROOT / "tasks" / "manifest.json")
-    assert len(tasks) == 9
+    assert len(tasks) == 15
     domains = [t.domain for t in tasks]
-    assert domains.count("gsm8k") == 3
-    assert domains.count("humaneval") == 3
-    assert domains.count("hotpotqa") == 3
+    assert domains.count("gsm8k") == 5
+    assert domains.count("humaneval") == 5
+    assert domains.count("hotpotqa") == 5
 
 
 def test_humaneval_tasks_carry_grading_payload():

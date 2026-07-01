@@ -50,6 +50,35 @@ class SwarmConfig:
 
 
 @dataclass(frozen=True)
+class JudgeConfig:
+    """LLM-as-judge, run as a post-processing pass (secondary metric).
+
+    Defaults to a *different model family* than the backend to avoid a model
+    grading its own family's outputs. Endpoint/provider/model are overridable
+    per-machine via JUDGE_PROVIDER / JUDGE_BASE_URL / JUDGE_MODEL.
+    """
+
+    provider: str
+    base_url: str
+    model: str
+    max_score: int
+    prompt_file: str
+
+    def resolved(self, environ: dict[str, str] | None = None) -> "JudgeConfig":
+        environ = os.environ if environ is None else environ
+        return replace(
+            self,
+            provider=environ.get("JUDGE_PROVIDER", self.provider),
+            base_url=environ.get("JUDGE_BASE_URL", self.base_url),
+            model=environ.get("JUDGE_MODEL", self.model),
+        )
+
+    def api_key(self, environ: dict[str, str] | None = None) -> str:
+        environ = os.environ if environ is None else environ
+        return environ.get("JUDGE_API_KEY", environ.get("LLM_API_KEY", "lm-studio"))
+
+
+@dataclass(frozen=True)
 class EnvironmentConfig:
     key: str
     name: str
@@ -87,6 +116,7 @@ class Config:
     decoding: DecodingConfig
     agentic: AgenticConfig
     swarm: SwarmConfig
+    judge: JudgeConfig
     environments: dict[str, EnvironmentConfig]
     trials_n: int
     tasks_manifest: str
@@ -179,6 +209,13 @@ def load_config(path: str | Path) -> Config:
             aggregation=_require(data, "architectures", "swarm", "aggregation"),
             tie_break=_require(data, "architectures", "swarm", "tie_break"),
             peer_seed_strategy=_require(data, "architectures", "swarm", "peer_seed_strategy"),
+        ),
+        judge=JudgeConfig(
+            provider=_require(data, "judge", "provider"),
+            base_url=_require(data, "judge", "base_url"),
+            model=_require(data, "judge", "model"),
+            max_score=int(_require(data, "judge", "max_score")),
+            prompt_file=_require(data, "judge", "prompt_file"),
         ),
         environments=environments,
         trials_n=int(_require(data, "trials", "n")),

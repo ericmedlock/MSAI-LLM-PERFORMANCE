@@ -70,6 +70,10 @@ class CellSummary:
     action_count: Stat
     tokens_per_s: Stat
     peak_ram_mb: Stat = field(default_factory=lambda: Stat(0, 0.0, 0.0))
+    # LLM-as-judge (populated only when judge rows are joined in)
+    judge_quality: Stat = field(default_factory=lambda: Stat(0, 0.0, 0.0))
+    judge_correct_rate: Optional[float] = None    # fraction judge marked CORRECT
+    judge_agreement: Optional[float] = None       # fraction judge == auto-grader
 
     def label(self, order: tuple[str, ...]) -> str:
         return " / ".join(str(self.keys[k]) for k in order if k in self.keys)
@@ -89,6 +93,16 @@ def summarize(records: list[dict], group_keys: tuple[str, ...]) -> list[CellSumm
     for key, rows in sorted(groups.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
         n = len(rows)
         correct = sum(1 for r in rows if r.get("correct") is True)
+        judged = [r for r in rows if r.get("judge_correct") is not None]
+        judge_correct_rate = (
+            sum(1 for r in judged if r.get("judge_correct")) / len(judged) if judged else None
+        )
+        judge_agreement = (
+            sum(1 for r in judged if bool(r.get("judge_correct")) == bool(r.get("correct")))
+            / len(judged)
+            if judged
+            else None
+        )
         summaries.append(
             CellSummary(
                 keys=dict(zip(group_keys, key)),
@@ -100,9 +114,33 @@ def summarize(records: list[dict], group_keys: tuple[str, ...]) -> list[CellSumm
                 action_count=stat(r.get("action_count") for r in rows),
                 tokens_per_s=stat(r.get("tokens_per_s") for r in rows),
                 peak_ram_mb=stat((r.get("telemetry") or {}).get("peak_ram_mb") for r in rows),
+                judge_quality=stat(r.get("judge_score") for r in rows),
+                judge_correct_rate=judge_correct_rate,
+                judge_agreement=judge_agreement,
             )
         )
     return summaries
+
+
+def load_judge(paths: Iterable[str | Path]) -> list[dict]:
+    """Load judge rows (same JSONL shape) from ``results/judge/`` files."""
+    return load_records(paths)
+
+
+def join_judge(records: list[dict], judge_rows: list[dict]) -> list[dict]:
+    """Attach ``judge_score``/``judge_correct`` to each run row by ``run_id``.
+
+    Returns new dicts (inputs untouched). Runs without a judgment keep None.
+    """
+    by_id = {j["run_id"]: j for j in judge_rows}
+    joined: list[dict] = []
+    for r in records:
+        j = by_id.get(r.get("run_id"))
+        merged = dict(r)
+        merged["judge_score"] = j.get("judge_score") if j else None
+        merged["judge_correct"] = j.get("judge_correct") if j else None
+        joined.append(merged)
+    return joined
 
 
 # --------------------------------------------------------------------------- #

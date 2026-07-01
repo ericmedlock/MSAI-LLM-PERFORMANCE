@@ -110,6 +110,31 @@ rows, so a crash mid-run loses nothing. Monitor the GPU in another terminal
 with a macOS tool such as `sudo powermetrics --samplers gpu_power` or
 [`mactop`](https://github.com/context-labs/mactop).
 
+## Scoring: auto-grade (primary) + LLM-as-judge (secondary)
+
+Two phases, run in order — **all benchmarks first, then judge as
+post-processing** (one GPU can't hold the backend and judge models at once,
+and keeping them separate keeps raw run data immutable):
+
+```bash
+# Phase 1 — run benchmarks (writes results/<env>.jsonl, binary auto-graded)
+./.venv/bin/python -m harness.run --task-id gsm8k-004 --trials 5
+
+# Phase 2 — judge the recorded answers (writes results/judge/<env>.jsonl)
+./.venv/bin/python -m harness.judge          # uses Gemma; see config `judge:`
+
+# Phase 3 — analyze (joins judge rows in automatically)
+./.venv/bin/python -m harness.analyze --charts
+```
+
+- **Primary metric stays the binary auto-grader** (exact numeric / unit-test /
+  normalized-string). The judge is a **secondary** quality score (0–4) plus an
+  independent correctness opinion, and an *agreement-with-auto-grader* rate.
+- The judge model is a **different family** (Gemma) from the Qwen-based backend
+  to avoid a model rewarding its own family. Override with `JUDGE_MODEL` etc.
+- Judge rows live in `results/judge/` keyed by `run_id`; the raw run rows are
+  never modified. Both phases are idempotent/resumable.
+
 ## Cloud cell (Azure GPU VM)
 
 Provisioned from committed scripts so the cloud environment is reproducible.

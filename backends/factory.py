@@ -35,36 +35,56 @@ def build_backend(
     raise ValueError(f"unknown backend {name!r}; expected one of {BACKEND_NAMES}")
 
 
-def build_client(config: Config, environment: str | None = None) -> LLMClient:
-    """Build the LLM client for an environment, selected by provider.
-
-    Endpoint/provider/model/key are resolved with per-machine ``.env``
-    overrides applied; the pinned decoding parameters come from config.
-    Concrete HTTP clients are imported lazily so offline tests never need them.
-    """
-    env = config.env(environment).resolved()
-    decoding = config.decoding
-    if env.provider == "ollama":
+def _make_client(
+    provider: str, base_url: str, model: str, decoding, api_key: str
+) -> LLMClient:
+    """Construct a provider client. Concrete HTTP clients are imported lazily
+    so offline tests never require them."""
+    if provider == "ollama":
         from backends.llm_client import OllamaClient
 
         return OllamaClient(
-            endpoint=env.base_url,
-            model_tag=env.model,
+            endpoint=base_url,
+            model_tag=model,
             temperature=decoding.temperature,
             num_ctx=decoding.num_ctx,
             max_tokens=decoding.max_tokens,
             seed=decoding.seed,
         )
-    if env.provider in ("openai", "openai-compatible", "lmstudio"):
+    if provider in ("openai", "openai-compatible", "lmstudio"):
         from backends.llm_client import OpenAICompatibleClient
 
         return OpenAICompatibleClient(
-            base_url=env.base_url,
-            model_tag=env.model,
+            base_url=base_url,
+            model_tag=model,
             temperature=decoding.temperature,
             num_ctx=decoding.num_ctx,
             max_tokens=decoding.max_tokens,
             seed=decoding.seed,
-            api_key=env.api_key(),
+            api_key=api_key,
         )
-    raise ValueError(f"unknown provider {env.provider!r} for environment {env.key!r}")
+    raise ValueError(f"unknown provider {provider!r}")
+
+
+def build_client(config: Config, environment: str | None = None) -> LLMClient:
+    """Build the backend LLM client for an environment, selected by provider.
+
+    Endpoint/provider/model/key are resolved with per-machine ``.env``
+    overrides; pinned decoding parameters come from config.
+    """
+    env = config.env(environment).resolved()
+    try:
+        return _make_client(env.provider, env.base_url, env.model, config.decoding, env.api_key())
+    except ValueError as exc:
+        raise ValueError(f"{exc} for environment {env.key!r}") from None
+
+
+def build_judge_client(config: Config) -> LLMClient:
+    """Build the LLM-as-judge client (different-family model, temp 0.0)."""
+    judge = config.judge.resolved()
+    try:
+        return _make_client(
+            judge.provider, judge.base_url, judge.model, config.decoding, judge.api_key()
+        )
+    except ValueError as exc:
+        raise ValueError(f"{exc} for judge") from None

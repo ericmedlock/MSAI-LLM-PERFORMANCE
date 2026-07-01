@@ -64,6 +64,20 @@ environments:
     api_key_env: LLM_API_KEY
     runtime: cuda
 
+# LLM-as-judge: a SECONDARY quality metric produced by a post-processing pass
+# (harness.judge) AFTER all benchmark runs are recorded. Binary auto-grading
+# stays the PRIMARY metric (pre-reg S7); the judge adds a graded-quality score
+# and an independent correctness opinion. The judge model is deliberately a
+# DIFFERENT FAMILY from the backend (backend = Qwen-based DeepSeek-R1 distill;
+# judge = Gemma) to avoid a model rewarding its own family. Overridable via
+# JUDGE_PROVIDER / JUDGE_BASE_URL / JUDGE_MODEL in .env.
+judge:
+  provider: openai
+  base_url: "http://localhost:1234/v1"
+  model: "google/gemma-4-31b"
+  max_score: 4                     # quality scale 0..4
+  prompt_file: "prompts/judge/system.txt"
+
 tasks_manifest: "tasks/manifest.json"
 prompts_dir: "prompts"
 results_dir: "results"

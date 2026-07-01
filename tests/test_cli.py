@@ -27,4 +27,4 @@ def test_default_plan_is_all_backends_all_tasks_n5(capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "monolithic, agentic, swarm" in out
-    assert "Total cells : 135 runs" in out  # 9 tasks x 3 backends x 5 trials
+    assert "Total cells : 225 runs" in out  # 15 tasks x 3 backends x 5 trials

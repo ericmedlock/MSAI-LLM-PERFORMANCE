@@ -116,6 +116,29 @@ def build_report(records: list[dict]) -> str:
         )
         out.append("")
 
+    # 3b) LLM-as-judge secondary metrics (only if judge data was joined in).
+    judged = summarize([r for r in records if r.get("judge_correct") is not None], ("backend",))
+    if judged:
+        out.append("## LLM-as-judge (secondary metric)\n")
+        out.append(
+            "_Different-family judge model; quality 0–max, and agreement with the "
+            "primary auto-grader._\n"
+        )
+        rows = [
+            [
+                s.keys["backend"],
+                str(s.judge_quality.n),
+                s.judge_quality.fmt(places=2),
+                f"{s.judge_correct_rate * 100:.0f}%" if s.judge_correct_rate is not None else "—",
+                f"{s.judge_agreement * 100:.0f}%" if s.judge_agreement is not None else "—",
+            ]
+            for s in judged
+        ]
+        out.append(
+            _table(["backend", "n", "quality", "judge·correct", "agree·w/·auto"], rows)
+        )
+        out.append("")
+
     # 4) Error distribution by architecture.
     out.append("## Error distribution by architecture\n")
     dist = error_distribution(records, "backend")

@@ -101,6 +101,78 @@
       "prompt": "What is the capital of the country whose national animal is the Bengal tiger?",
       "answer": "New Delhi",
       "grading": {}
+    },
+    {
+      "task_id": "gsm8k-004",
+      "domain": "gsm8k",
+      "source_id": "GSM8K-style hard (apples percentage + remainder)",
+      "id_status": "PLACEHOLDER_PENDING_FREEZE",
+      "difficulty": "hard",
+      "selection_reason": "Multi-step: percentage then remainder; a common error is applying the second step to the original total.",
+      "prompt": "A store had 120 apples. They sold 40% of them in the morning, then sold 25 of the remaining apples in the afternoon. How many apples are left?",
+      "answer": "47",
+      "grading": {}
+    },
+    {
+      "task_id": "gsm8k-005",
+      "domain": "gsm8k",
+      "source_id": "GSM8K-style hard (ratio split)",
+      "id_status": "PLACEHOLDER_PENDING_FREEZE",
+      "difficulty": "hard",
+      "selection_reason": "Requires setting up a ratio equation rather than direct arithmetic.",
+      "prompt": "Tom has three times as many marbles as Jerry. Together they have 48 marbles. How many marbles does Tom have?",
+      "answer": "36",
+      "grading": {}
+    },
+    {
+      "task_id": "humaneval-004",
+      "domain": "humaneval",
+      "source_id": "HumanEval-style hard (second largest distinct)",
+      "id_status": "PLACEHOLDER_PENDING_FREEZE",
+      "difficulty": "hard",
+      "selection_reason": "Requires handling duplicates (distinct values); a naive sort-and-index-[-2] fails on repeats.",
+      "prompt": "Complete this Python function. Return only the full function in a single ```python code block.\n\nfrom typing import List\n\ndef second_largest(nums: List[int]) -> int:\n    \"\"\" Return the second largest DISTINCT value in nums.\n    >>> second_largest([3, 1, 4, 1, 5])\n    4\n    >>> second_largest([7, 7, 2])\n    2\n    \"\"\"",
+      "answer": null,
+      "grading": {
+        "entry_point": "second_largest",
+        "test": "def check(candidate):\n    assert candidate([3, 1, 4, 1, 5]) == 4\n    assert candidate([7, 7, 2]) == 2\n    assert candidate([10, 9]) == 9\n    assert candidate([1, 2, 2, 3]) == 2\n"
+      }
+    },
+    {
+      "task_id": "humaneval-005",
+      "domain": "humaneval",
+      "source_id": "HumanEval-style hard (count vowels, case-insensitive)",
+      "id_status": "PLACEHOLDER_PENDING_FREEZE",
+      "difficulty": "medium",
+      "selection_reason": "Case-insensitivity and empty handling; easy to get subtly wrong.",
+      "prompt": "Complete this Python function. Return only the full function in a single ```python code block.\n\ndef count_vowels(s: str) -> int:\n    \"\"\" Return the number of vowels (a, e, i, o, u) in s, case-insensitive.\n    >>> count_vowels(\"hello\")\n    2\n    >>> count_vowels(\"SKY\")\n    0\n    \"\"\"",
+      "answer": null,
+      "grading": {
+        "entry_point": "count_vowels",
+        "test": "def check(candidate):\n    assert candidate(\"hello\") == 2\n    assert candidate(\"SKY\") == 0\n    assert candidate(\"AEIOU\") == 5\n    assert candidate(\"Programming\") == 3\n    assert candidate(\"\") == 0\n"
+      }
+    },
+    {
+      "task_id": "hotpotqa-004",
+      "domain": "hotpotqa",
+      "source_id": "HotpotQA-style hard (bridge: landmark -> country -> currency)",
+      "id_status": "PLACEHOLDER_PENDING_FREEZE",
+      "difficulty": "medium",
+      "selection_reason": "Two-hop bridge reasoning with an unambiguous answer.",
+      "prompt": "What is the currency of the country where the Eiffel Tower is located?",
+      "answer": "Euro",
+      "grading": {}
+    },
+    {
+      "task_id": "hotpotqa-005",
+      "domain": "hotpotqa",
+      "source_id": "HotpotQA-style hard (reef -> country -> capital; common misconception)",
+      "id_status": "PLACEHOLDER_PENDING_FREEZE",
+      "difficulty": "hard",
+      "selection_reason": "Two-hop; the frequent wrong answer (Sydney) makes it discriminating.",
+      "prompt": "What is the capital of the country where the Great Barrier Reef is located?",
+      "answer": "Canberra",
+      "grading": {}
     }
   ]
 }
