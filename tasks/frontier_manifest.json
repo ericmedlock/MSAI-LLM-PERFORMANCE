@@ -1,0 +1,120 @@
+{
+  "_comment": "FRONTIER TIER (v2 amendment 2026-07-01). Architecture-favoring tasks: harder than the baseline suite, chosen so agentic self-correction and swarm voting have room to help. Objectively graded (numeric / unit-test / normalized string) so no human bottleneck. These items are CANDIDATES: id_status=CANDIDATE_UNCALIBRATED. Before freezing, calibrate against the pinned model (deepseek-r1-distill-qwen-14b): run monolithic at N>=5 and KEEP items whose single-pass accuracy lands in ~0.4-0.7 (the band where architecture flips outcomes); drop items the model always gets right (no headroom) or always wrong (unreachable). See docs/TASK_TIERS.md.",
+  "tier": "frontier",
+  "frozen": false,
+  "frozen_on": null,
+  "calibration_status": "CANDIDATE_UNCALIBRATED",
+  "tasks": [
+    {
+      "task_id": "fm-math-001",
+      "domain": "math",
+      "tier": "frontier",
+      "source_id": "authored (inclusion-exclusion counting)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Multi-step inclusion-exclusion; single-pass slips are common and self-checking (agentic) can catch them.",
+      "prompt": "How many positive integers less than 1000 are divisible by neither 5 nor 7? Give the final count as a single integer on the last line.",
+      "answer": "686",
+      "grading": {}
+    },
+    {
+      "task_id": "fm-math-002",
+      "domain": "math",
+      "tier": "frontier",
+      "source_id": "authored (circular permutations w/ restriction)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Circular permutation with an adjacency restriction; error-prone in one pass.",
+      "prompt": "In how many ways can 8 distinct people be seated around a round table if two specific people refuse to sit next to each other? Rotations of a seating are considered the same arrangement. Give the final count as a single integer on the last line.",
+      "answer": "3600",
+      "grading": {}
+    },
+    {
+      "task_id": "fm-math-003",
+      "domain": "math",
+      "tier": "frontier",
+      "source_id": "authored (modular exponentiation)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Modular arithmetic; benefits from spotting the cycle, easy to slip.",
+      "prompt": "What is the remainder when 2^100 is divided by 7? Give the final answer as a single integer on the last line.",
+      "answer": "2",
+      "grading": {}
+    },
+    {
+      "task_id": "fm-math-004",
+      "domain": "math",
+      "tier": "frontier",
+      "source_id": "authored (work-rate with a drain)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Combined work rates including a negative (drain) term; sign errors are common.",
+      "prompt": "Pipe A fills a tank in 6 hours, pipe B fills it in 4 hours, and pipe C drains it in 12 hours. If all three are open together, how many hours does it take to fill the empty tank? Give the final answer as a single integer on the last line.",
+      "answer": "3",
+      "grading": {}
+    },
+    {
+      "task_id": "fm-code-001",
+      "domain": "code",
+      "tier": "frontier",
+      "source_id": "authored (coin change, min coins)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Classic DP; a naive greedy solution fails, so a verifier/retry loop (agentic) can help.",
+      "prompt": "Complete this Python function. Return only the full function in a single ```python code block.\n\nfrom typing import List\n\ndef coin_change(coins: List[int], amount: int) -> int:\n    \"\"\" Return the fewest number of coins needed to make up `amount` using unlimited\n    coins of the given denominations, or -1 if it cannot be made.\n    >>> coin_change([1, 2, 5], 11)\n    3\n    >>> coin_change([2], 3)\n    -1\n    \"\"\"",
+      "answer": null,
+      "reference_solution": "from typing import List\ndef coin_change(coins: List[int], amount: int) -> int:\n    INF = float('inf')\n    dp = [0] + [INF] * amount\n    for a in range(1, amount + 1):\n        for c in coins:\n            if c <= a and dp[a - c] + 1 < dp[a]:\n                dp[a] = dp[a - c] + 1\n    return dp[amount] if dp[amount] != INF else -1\n",
+      "grading": {
+        "entry_point": "coin_change",
+        "test": "def check(candidate):\n    assert candidate([1, 2, 5], 11) == 3\n    assert candidate([2], 3) == -1\n    assert candidate([1], 0) == 0\n    assert candidate([5], 5) == 1\n    assert candidate([1, 2, 5], 7) == 2\n"
+      }
+    },
+    {
+      "task_id": "fm-code-002",
+      "domain": "code",
+      "tier": "frontier",
+      "source_id": "authored (word break, DP)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Segmentation DP; greedy fails on backtracking cases.",
+      "prompt": "Complete this Python function. Return only the full function in a single ```python code block.\n\nfrom typing import List\n\ndef word_break(s: str, words: List[str]) -> bool:\n    \"\"\" Return True if s can be segmented into a space-separated sequence of one or\n    more words from the list `words` (each word may be reused).\n    >>> word_break(\"leetcode\", [\"leet\", \"code\"])\n    True\n    >>> word_break(\"catsandog\", [\"cats\", \"dog\", \"sand\", \"and\", \"cat\"])\n    False\n    \"\"\"",
+      "answer": null,
+      "reference_solution": "from typing import List\ndef word_break(s: str, words: List[str]) -> bool:\n    wordset = set(words)\n    n = len(s)\n    dp = [False] * (n + 1)\n    dp[0] = True\n    for i in range(1, n + 1):\n        for j in range(i):\n            if dp[j] and s[j:i] in wordset:\n                dp[i] = True\n                break\n    return dp[n]\n",
+      "grading": {
+        "entry_point": "word_break",
+        "test": "def check(candidate):\n    assert candidate(\"leetcode\", [\"leet\", \"code\"]) == True\n    assert candidate(\"applepenapple\", [\"apple\", \"pen\"]) == True\n    assert candidate(\"catsandog\", [\"cats\", \"dog\", \"sand\", \"and\", \"cat\"]) == False\n    assert candidate(\"a\", [\"a\"]) == True\n"
+      }
+    },
+    {
+      "task_id": "fm-code-003",
+      "domain": "code",
+      "tier": "frontier",
+      "source_id": "authored (longest common subsequence, DP)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "2D DP; commonly confused with longest common substring.",
+      "prompt": "Complete this Python function. Return only the full function in a single ```python code block.\n\ndef longest_common_subsequence(a: str, b: str) -> int:\n    \"\"\" Return the length of the longest common subsequence of strings a and b.\n    >>> longest_common_subsequence(\"abcde\", \"ace\")\n    3\n    >>> longest_common_subsequence(\"abc\", \"def\")\n    0\n    \"\"\"",
+      "answer": null,
+      "reference_solution": "def longest_common_subsequence(a: str, b: str) -> int:\n    m, n = len(a), len(b)\n    dp = [[0] * (n + 1) for _ in range(m + 1)]\n    for i in range(1, m + 1):\n        for j in range(1, n + 1):\n            if a[i - 1] == b[j - 1]:\n                dp[i][j] = dp[i - 1][j - 1] + 1\n            else:\n                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])\n    return dp[m][n]\n",
+      "grading": {
+        "entry_point": "longest_common_subsequence",
+        "test": "def check(candidate):\n    assert candidate(\"abcde\", \"ace\") == 3\n    assert candidate(\"abc\", \"abc\") == 3\n    assert candidate(\"abc\", \"def\") == 0\n    assert candidate(\"\", \"abc\") == 0\n    assert candidate(\"bl\", \"yby\") == 1\n"
+      }
+    },
+    {
+      "task_id": "fm-hop-001",
+      "domain": "multihop",
+      "tier": "frontier",
+      "source_id": "authored (multi-hop: laws of motion -> Newton -> Royal Mint)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Two-hop bridge requiring a less-famous second fact; single pass often stops at the first hop.",
+      "prompt": "The scientist who formulated the three laws of motion later served as Master of which English institution responsible for producing the nation's coins? Give only the institution's name on the last line.",
+      "answer": "Royal Mint",
+      "grading": {}
+    },
+    {
+      "task_id": "fm-hop-002",
+      "domain": "multihop",
+      "tier": "frontier",
+      "source_id": "authored (multi-hop: Lima -> Peru -> Pacific)",
+      "id_status": "CANDIDATE_UNCALIBRATED",
+      "selection_reason": "Two-hop geography bridge with an unambiguous answer.",
+      "prompt": "What ocean borders the western coast of the country whose capital city is Lima? Give only the ocean's name on the last line.",
+      "answer": "Pacific Ocean",
+      "grading": {}
+    }
+  ]
+}

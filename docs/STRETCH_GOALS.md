@@ -22,6 +22,15 @@ baseline**. These two changes define v2; both are pre-registration amendments.
   and analysis layers **carry over unchanged** — only the two backend internals
   are swapped, so this is a contained migration.
 
+### 3. Frontier task tier — DESIGNED, needs calibration + run
+
+Architecture-favoring tasks are now **in scope** (pre-reg Amendment Log,
+2026-07-01) and built: `tasks/frontier_manifest.json` + tier support throughout
+the harness. See **[docs/TASK_TIERS.md](TASK_TIERS.md)**. Remaining work: run the
+calibration procedure (keep items where monolithic single-pass ∈ ~0.4–0.7),
+freeze the surviving set, then run all three backends + judge + analyze. This is
+what turns "we measured overhead" into "we found where each architecture wins."
+
 ### 2. Ensemble swarm (new condition, not a replacement)
 
 Decisions already made with the researcher:

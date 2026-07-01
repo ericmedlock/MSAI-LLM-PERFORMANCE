@@ -31,6 +31,7 @@ class RunRecord:
     environment: str
     task_id: str
     task_domain: str
+    task_tier: str
     trial_idx: int
     model_tag: str            # canonical, provider-independent model identity
     config_hash: str

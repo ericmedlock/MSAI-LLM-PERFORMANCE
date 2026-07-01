@@ -6,8 +6,10 @@ import json
 from pathlib import Path
 
 from backends.base import Task
+from harness.graders import ANSWER_DOMAINS, CODE_DOMAINS
 
-_VALID_DOMAINS = {"gsm8k", "humaneval", "hotpotqa"}
+_VALID_DOMAINS = ANSWER_DOMAINS | CODE_DOMAINS
+_VALID_TIERS = {"baseline", "frontier"}
 
 
 def load_tasks(manifest_path: str | Path) -> list[Task]:
@@ -22,11 +24,14 @@ def load_tasks(manifest_path: str | Path) -> list[Task]:
         if task_id in seen:
             raise ValueError(f"duplicate task_id {task_id!r} in manifest")
         seen.add(task_id)
-        if domain == "humaneval":
+        tier = item.get("tier", "baseline")
+        if tier not in _VALID_TIERS:
+            raise ValueError(f"task {task_id!r} has invalid tier {tier!r}")
+        if domain in CODE_DOMAINS:
             grading = item.get("grading", {})
             if "test" not in grading or "entry_point" not in grading:
                 raise ValueError(
-                    f"humaneval task {task_id!r} needs grading.test and grading.entry_point"
+                    f"{domain} task {task_id!r} needs grading.test and grading.entry_point"
                 )
         elif not item.get("answer"):
             raise ValueError(f"task {task_id!r} ({domain}) needs a non-empty 'answer'")
@@ -38,6 +43,7 @@ def load_tasks(manifest_path: str | Path) -> list[Task]:
                 answer=item.get("answer"),
                 grading=item.get("grading", {}),
                 source_id=item.get("source_id"),
+                tier=tier,
             )
         )
     if not tasks:

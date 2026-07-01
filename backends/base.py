@@ -23,11 +23,12 @@ class Task:
     """
 
     task_id: str
-    domain: str                      # "gsm8k" | "humaneval" | "hotpotqa"
+    domain: str                      # "gsm8k" | "humaneval" | "hotpotqa" | "math" | "code"
     prompt: str                      # the user-facing question / instruction
     answer: Optional[str] = None     # expected answer (gsm8k number, hotpotqa string)
     grading: dict = field(default_factory=dict)  # grader payload (humaneval: test + entry_point)
     source_id: Optional[str] = None  # original benchmark item id (for provenance)
+    tier: str = "baseline"           # "baseline" (v1) | "frontier" (architecture-favoring)
 
 
 @dataclass

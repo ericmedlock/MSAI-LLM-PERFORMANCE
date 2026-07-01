@@ -160,6 +160,7 @@ class Runner:
             environment=environment,
             task_id=task.task_id,
             task_domain=task.domain,
+            task_tier=task.tier,
             trial_idx=trial_idx,
             model_tag=self._config.model.tag,
             config_hash=self._config.config_hash,

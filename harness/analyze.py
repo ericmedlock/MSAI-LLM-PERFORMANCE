@@ -44,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     paths = [p for p in (sorted(glob.glob(args.results)) or [args.results]) if "/judge/" not in p]
     records = load_records(paths)
+    for r in records:  # v1 rows predate the tier field
+        r.setdefault("task_tier", "baseline")
 
     judge_paths = sorted(glob.glob(args.judge))
     judge_rows = load_judge(judge_paths)

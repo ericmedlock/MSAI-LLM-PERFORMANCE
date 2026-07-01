@@ -84,6 +84,15 @@ def build_report(records: list[dict], host_profiles: list[dict] | None = None) -
         out.append(_table(metric_header, _agg_rows(summaries, ("backend",))))
     out.append("")
 
+    # 1b) Per-tier × architecture — the key view for "does architecture matter
+    # on architecture-favoring tasks?" Only shown when >1 tier is present.
+    tiers = sorted({r.get("task_tier", "baseline") for r in records})
+    if len(tiers) > 1:
+        out.append("## By tier × architecture\n")
+        tier_summ = summarize(records, ("task_tier", "backend"))
+        out.append(_table(metric_header, _agg_rows(tier_summ, ("task_tier", "backend"))))
+        out.append("")
+
     # 2) Per-cell (backend × task).
     out.append("## By architecture × task\n")
     cells = summarize(records, ("task_id", "backend"))
