@@ -1,2 +1,140 @@
-# MSAI-LLM-PERFORMANCE
+# LLM Execution Architecture Benchmark
 
+Controlled comparison of **monolithic**, **agentic**, and **swarm** LLM
+execution architectures across an **on-prem (Apple M5 Max / Metal)** and a
+**cloud (Azure GPU VM / CUDA)** environment.
+
+> **Source of truth:** [`PRE_REGISTRATION.md`](PRE_REGISTRATION.md). All
+> pinned decisions (model, decoding, topologies, task suite, N, metrics) are
+> frozen there. This code implements it; it does not re-decide anything. Any
+> change goes in the pre-registration Amendment Log.
+
+One interface, three engines, two environments, identical tasks. The only
+things that vary across the six cells (`L-M L-A L-S C-M C-A C-S`) are the
+**architecture** and the **environment** — model, quantization, prompts,
+task inputs, temperature (`0.0`), context window, and max-tokens are held
+constant and live in [`config/config.yaml`](config/config.yaml), never in code.
+
+## Layout
+
+```text
+config/config.yaml        # all pinned values (nothing pinned is hardcoded)
+prompts/                  # version-controlled system prompts, frozen after pilot
+  monolithic/ agentic/ swarm/
+tasks/manifest.json       # 9 frozen items (3 GSM8K / 3 HumanEval / 3 HotpotQA)
+backends/
+  base.py                 # Backend ABC + BackendResult + Task (the shared contract)
+  llm_client.py           # LLMClient protocol + pinned OllamaClient
+  monolithic.py           # single call
+  agentic.py              # Executor+Verifier loop, max 2 (LangGraph, sequential)
+  swarm.py                # 3 peers in parallel, no controller, majority vote (LangGraph)
+  factory.py              # build backends/client from config
+harness/
+  config.py telemetry.py graders.py task_loader.py results.py runner.py run.py
+results/                  # per-run JSONL telemetry (committed — figures are replayable)
+scripts/                  # env snapshot + Azure provisioning
+tests/                    # offline pytest suite (no model, no GPU, no network)
+```
+
+## Quick start (Apple M5 Max — local cell)
+
+```bash
+# 1. Python env (note: a broken `python3` alias may exist; use an explicit interpreter)
+python3.13 -m venv .venv
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -r requirements.txt
+
+# 2. Offline smoke test — verifies structure without touching a model
+./.venv/bin/python -m pytest -q
+
+# 3. Install Ollama + pull the pinned model (for real runs)
+#    https://ollama.com/download  (macOS, Metal backend)
+ollama pull deepseek-r1:14b
+ollama show deepseek-r1:14b        # copy the digest into config.yaml `model.digest`
+
+# 4. Record an environment snapshot (commit alongside results)
+./.venv/bin/python scripts/env_snapshot.py > results/env_local_$(date +%Y%m%d).json
+```
+
+## Run a pilot (1–2 tasks, local)
+
+`config/config.yaml` has `active_environment: local`, so these hit your local
+Ollama on the M5 Max. Preview the plan first, then run:
+
+```bash
+# Preview only — no model calls
+./.venv/bin/python -m harness.run --task-id gsm8k-001 --dry-run
+
+# Pilot: ONE task, all three backends, N=5  (15 runs)
+./.venv/bin/python -m harness.run --task-id gsm8k-001
+
+# Pilot: TWO tasks, all three backends, N=5  (30 runs)
+./.venv/bin/python -m harness.run --task-id gsm8k-001 --task-id humaneval-001
+
+# One backend only, fewer trials (fast sanity check)
+./.venv/bin/python -m harness.run --task-id gsm8k-001 --backend monolithic --trials 2
+```
+
+Output lands in `results/local.jsonl`, **one row per run**. The runner is
+**idempotent/resumable**: re-running the same command tops up only missing
+rows, so a crash mid-run loses nothing. Monitor the GPU in another terminal
+with a macOS tool such as `sudo powermetrics --samplers gpu_power` or
+[`mactop`](https://github.com/context-labs/mactop).
+
+## Cloud cell (Azure GPU VM)
+
+Provisioned from committed scripts so the cloud environment is reproducible.
+**Request NC-series GPU quota early** — on student subscriptions it is often
+zero by default and approval can take a day.
+
+```bash
+az login
+RESOURCE_GROUP=llm-bench REGION=eastus VM_SIZE=Standard_NC4as_T4_v3 \
+  bash scripts/provision_azure.sh create
+# then, as printed, run the remote setup (installs driver + Ollama + repo + model):
+ssh azureuser@<vm-ip> 'bash -s' < scripts/setup_remote.sh
+```
+
+The remote setup flips `active_environment: cloud` on the VM and runs the
+harness there, where the NVIDIA GPU is local to the process so `pynvml`
+captures VRAM / utilization / power. Generate the cloud cell with the same
+commands as above (they read `cloud` from config). Copy `results/cloud.jsonl`
+back and commit it. **Deallocate when idle** to stop GPU billing:
+
+```bash
+bash scripts/provision_azure.sh deallocate
+```
+
+## Testing
+
+```bash
+./.venv/bin/python -m pytest --cov --cov-report=term-missing
+```
+
+The suite is fully **offline** — backends run against a scripted
+`FakeLLMClient`, so the three architectures, the graders, resume/idempotency,
+and swarm parallelism are all verified without a model or GPU. Uncovered
+lines are the live `OllamaClient` and CUDA/NVML telemetry paths, which require
+the respective hardware.
+
+> **On Playwright:** this project has no browser/web UI, so Playwright (a
+> browser-automation tool) does not apply — pytest is the correct end-to-end
+> tool here. If a results dashboard is added later, Playwright E2E tests
+> belong with it.
+
+## Reproducibility invariants (enforced by config + tests)
+
+- Model tag/digest, quantization, temperature `0.0`, context, max-tokens,
+  seed, and N live in `config/config.yaml`; a `config_hash` is stamped on
+  every row.
+- Prompts are files under `prompts/`, frozen after the pilot.
+- Agentic/swarm use role-specific prompts that **differ** from monolithic —
+  documented, not hidden.
+- Raw per-run telemetry is committed so all figures are replayable.
+
+## Flagged decision (needs advisor sign-off → Amendment Log)
+
+With `temperature=0.0`, a single shared seed makes all swarm peers identical
+and majority vote degenerate. Peers therefore draw with
+`seed = base_seed + peer_index` (reproducible but diverse). Toggle via
+`swarm.peer_seed_strategy` in code. Confirm and log in `PRE_REGISTRATION.md`.
