@@ -176,6 +176,13 @@ the respective hardware.
 > tool here. If a results dashboard is added later, Playwright E2E tests
 > belong with it.
 
+## Stretch goals / future work
+
+Beyond the pre-registered study — see [docs/STRETCH_GOALS.md](docs/STRETCH_GOALS.md).
+Notably a **multi-machine swarm/agentic run** (each agent on its own physical
+machine → true hardware parallelism, no single-GPU contention), plus the cloud
+cell, a heavier judge, and model-family generalization.
+
 ## Reproducibility invariants (enforced by config + tests)
 
 - Model tag/digest, quantization, temperature `0.0`, context, max-tokens,
