@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-arch-benchmark"
+version = "0.1.0"
+description = "Controlled benchmark of monolithic / agentic / swarm LLM execution architectures"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = ["backends", "harness"]
+
+[tool.pytest.ini_options]
+# run from the repo root; make the project importable without installation
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "integration: hits a live model server (LM Studio / Ollama); skipped when unreachable",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["backends", "harness"]

@@ -1,0 +1,90 @@
+# =====================================================================
+# FROZEN EXPERIMENT CONFIG  --  source of pinned values for every cell
+# =====================================================================
+# Per PRE_REGISTRATION.md, the following are held IDENTICAL across all
+# backends and both environments. Only `active_environment` and the
+# backend selected on the CLI change between runs. Do not edit after the
+# pilot freeze except via the pre-registration Amendment Log.
+
+# Which environment this machine represents. Read from config, never code.
+#   local -> Apple M5 Max (Metal)   |   cloud -> Azure GPU VM (CUDA)
+active_environment: local
+
+model:
+  # Canonical (provider-independent) identity of the pinned model. Each
+  # environment maps this to its own provider-specific id below; both are
+  # recorded on every telemetry row so cells stay comparable.
+  tag: "deepseek-r1-14b-distill-q4_k_m"
+  quantization: "Q4_K_M"
+  digest: ""                       # fill from the serving runtime at freeze
+
+decoding:
+  temperature: 0.0                 # pinned for determinism (see pre-reg S5 tension)
+  num_ctx: 8192                    # fixed context window
+  max_tokens: 6144                 # fixed max output tokens; raised from 2048 —
+                                   # DeepSeek-R1's chain-of-thought exhausted 2048
+                                   # on code tasks before emitting any code (see
+                                   # Amendment Log 2026-07-01). Held constant across cells.
+  seed: 42                         # fixed seed -> reproducible sampling
+
+trials:
+  n: 5                             # runs per (task x architecture x environment)
+
+architectures:
+  agentic:
+    max_loops: 2                   # Executor+Verifier, diminishing returns after 2
+  swarm:
+    num_agents: 3                  # parallel peers
+    aggregation: majority_vote
+    tie_break: lowest_agent_index  # fixed rule: on a tie, take earliest peer's answer
+    # Per-peer decoding seed. `offset` -> peer i draws with (seed + i) so the
+    # peers are independent samples (required by pre-reg S2's "independent
+    # samples" premise, which a single shared seed at temperature 0.0 would
+    # violate). `same` -> all peers share the pinned seed. See Amendment Log
+    # entry 2026-07-01 in PRE_REGISTRATION.md.
+    peer_seed_strategy: offset     # offset | same
+
+# Per-environment serving config. `provider` selects the client:
+#   openai  -> OpenAI-compatible server (LM Studio, vLLM, llama.cpp)
+#   ollama  -> native Ollama /api/chat
+# `model` is the provider-specific model id. Any of provider/base_url/model/
+# api_key can be overridden per-machine (without editing this committed file)
+# via a .env file -- see .env.example. Endpoints/keys are machine-specific and
+# belong in .env; the pinned science stays here.
+environments:
+  local:
+    name: "Apple M5 Max (48GB, Metal) — LM Studio"
+    provider: openai
+    base_url: "http://localhost:1234/v1"
+    model: "deepseek-r1-distill-qwen-14b"   # LM Studio model id
+    api_key_env: LLM_API_KEY                 # optional; LM Studio ignores the value
+    runtime: metal
+  cloud:
+    name: "Azure GPU VM (Ubuntu, CUDA) — Ollama"
+    provider: ollama
+    base_url: "http://localhost:11434"
+    model: "deepseek-r1:14b"                 # Ollama tag
+    api_key_env: LLM_API_KEY
+    runtime: cuda
+
+# LLM-as-judge: a SECONDARY quality metric produced by a post-processing pass
+# (harness.judge) AFTER all benchmark runs are recorded. Binary auto-grading
+# stays the PRIMARY metric (pre-reg S7); the judge adds a graded-quality score
+# and an independent correctness opinion. The judge model is deliberately a
+# DIFFERENT FAMILY from the backend (backend = Qwen-based DeepSeek-R1 distill;
+# judge = Llama) to avoid a model rewarding its own family. Overridable via
+# JUDGE_PROVIDER / JUDGE_BASE_URL / JUDGE_MODEL in .env.
+# NOTE: a heavier judge (e.g. google/gemma-4-31b) grades the quality scale more
+# reliably but was too slow to load on the M5 Max in testing; llama-3.2-3b is
+# fast and reliable for the CORRECT/INCORRECT verdict, though its 0-4 quality
+# score is noisier. Swap up when a bigger judge is practical.
+judge:
+  provider: openai
+  base_url: "http://localhost:1234/v1"
+  model: "llama-3.2-3b-instruct"
+  max_score: 4                     # quality scale 0..4
+  prompt_file: "prompts/judge/system.txt"
+
+tasks_manifest: "tasks/manifest.json"
+prompts_dir: "prompts"
+results_dir: "results"
