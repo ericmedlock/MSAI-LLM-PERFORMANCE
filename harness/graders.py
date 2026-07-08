@@ -130,7 +130,16 @@ _GRADERS = {
     "gsm8k": grade_gsm8k,
     "hotpotqa": grade_hotpotqa,
     "humaneval": grade_humaneval,
+    # generic aliases for the frontier tier (same objective graders)
+    "math": grade_gsm8k,        # numeric-answer problems
+    "code": grade_humaneval,    # unit-test-graded code
+    "multihop": grade_hotpotqa,  # normalized string match
 }
+
+# domains graded by running unit tests (need grading.test + entry_point)
+CODE_DOMAINS = {"humaneval", "code"}
+# domains graded against a reference string/number (need a non-empty answer)
+ANSWER_DOMAINS = {"gsm8k", "hotpotqa", "math", "multihop"}
 
 
 def grade(task: Task, answer: str) -> tuple[bool, Optional[str]]:
@@ -148,10 +157,10 @@ def vote_key(domain: str, answer: str) -> str:
     Uses the same normalization as grading so a majority vote is measuring
     the same notion of "same answer" that grading measures.
     """
-    if domain == "gsm8k":
+    if domain in ("gsm8k", "math"):
         return extract_final_number(answer) or ""
-    if domain == "hotpotqa":
+    if domain in ("hotpotqa", "multihop"):
         return normalize_text(answer)
-    if domain == "humaneval":
+    if domain in ("humaneval", "code"):
         return extract_code(answer)
     return (answer or "").strip()

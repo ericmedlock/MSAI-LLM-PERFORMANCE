@@ -54,7 +54,9 @@ Azure cloud cell) and [results/README.md](results/README.md) for the data dictio
 | `config/config.yaml` | All pinned values (nothing pinned is hardcoded) |
 | `backends/` | Shared `Backend` interface + monolithic / agentic / swarm |
 | `harness/` | config, graders, telemetry, runner, judge, analysis, host profiling |
-| `tasks/manifest.json` | Frozen 15-item task suite (5 per domain) |
+| `tasks/manifest.json` | Frozen 15-item **baseline** task suite (5 per domain) |
+| `tasks/frontier_manifest.json` | Candidate **frontier** tier (architecture-favoring); see `docs/TASK_TIERS.md` |
+| `tasks/frontier_external_manifest.json` | Harder frontier candidates from MATH-500 / MBPP / MuSiQue; regenerate/extend via `scripts/build_frontier_external.py`. Calibrate on capable HW. |
 | `prompts/` | Version-controlled system prompts (frozen after pilot) |
 | `results/` | Frozen dataset, judge rows, hardware profile, report, charts |
 | `scripts/` | Azure provisioning, env/hardware snapshots, backfill |

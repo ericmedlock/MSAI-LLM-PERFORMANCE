@@ -3,7 +3,24 @@ contacting a model."""
 
 from __future__ import annotations
 
+import pytest
+
+import harness.run as run_module
 from harness.run import main
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_env(monkeypatch):
+    """Isolate the banner assertions from a developer's local ``.env``.
+
+    ``main()`` calls ``load_dotenv()`` which reads ``./.env`` at runtime, so a
+    dev override (e.g. MODEL_TAG/LLM_MODEL on a prototyping box) would otherwise
+    change the plan banner these tests assert on. Neutralize both the file read
+    and any already-exported overrides so the tests see the committed defaults.
+    """
+    monkeypatch.setattr(run_module, "load_dotenv", lambda *a, **k: {})
+    for var in ("LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "MODEL_TAG", "MODEL_QUANT"):
+        monkeypatch.delenv(var, raising=False)
 
 
 def test_dry_run_reports_plan_and_does_not_call_model(capsys):

@@ -22,6 +22,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="harness.run", description=__doc__)
     p.add_argument("--config", default="config/config.yaml", help="path to config.yaml")
     p.add_argument(
+        "--manifest",
+        help="task manifest override (default: tasks_manifest from config); "
+        "e.g. tasks/frontier_manifest.json to run the frontier tier",
+    )
+    p.add_argument(
         "--backend",
         action="append",
         choices=BACKEND_NAMES,
@@ -51,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     load_dotenv()  # per-machine endpoint/provider/model/key overrides
     config = load_config(args.config)
     prompts = load_prompts(config.prompts_dir)
-    all_tasks = load_tasks(config.tasks_manifest)
+    all_tasks = load_tasks(args.manifest or config.tasks_manifest)
 
     environment = args.environment or config.active_environment
     backends = args.backend or list(BACKEND_NAMES)
@@ -74,9 +79,11 @@ def main(argv: list[str] | None = None) -> int:
     env = config.env(environment).resolved()
     print(f"Environment : {environment} ({env.name})")
     print(f"Provider    : {env.provider} @ {env.base_url}")
-    print(f"Model       : {env.model}  [canonical: {config.model.tag} {config.model.quantization}]")
+    model = config.model.resolved()
+    print(f"Model       : {env.model}  [canonical: {model.tag} {model.quantization}]")
     print(f"Backends    : {', '.join(backends)}")
-    print(f"Tasks       : {len(tasks)}  ({', '.join(t.task_id for t in tasks)})")
+    tiers = sorted({t.tier for t in tasks})
+    print(f"Tasks       : {len(tasks)}  (tier: {', '.join(tiers)})")
     print(f"Trials (N)  : {trials}")
     print(f"Total cells : {total} runs -> {output}")
 

@@ -6,7 +6,12 @@ import json
 
 from backends.base import Task
 from harness.analysis import join_judge, summarize
-from harness.judge import build_judge_user_prompt, judge_records, parse_judgment
+from harness.judge import (
+    build_judge_user_prompt,
+    judge_records,
+    load_task_index,
+    parse_judgment,
+)
 from tests.conftest import FakeLLMClient
 
 
@@ -33,6 +38,21 @@ def test_judge_user_prompt_includes_reference_when_present():
     task = Task("t", "gsm8k", "2+2?", answer="4")
     prompt = build_judge_user_prompt(task, "the answer is 4")
     assert "REFERENCE" in prompt and "4" in prompt and "candidate" in prompt.lower()
+
+
+# -- manifest loading (baseline + frontier) --------------------------------- #
+def test_load_task_index_merges_baseline_and_frontier_manifests():
+    # judging spans tiers, so the judge must resolve gold context for BOTH the
+    # baseline manifest and the frontier manifest (the gap this fixes).
+    index = load_task_index(["tasks/manifest.json", "tasks/frontier_manifest.json"])
+    assert "gsm8k-001" in index          # baseline row resolves
+    assert "fm-math-001" in index        # frontier row resolves (previously could not)
+    assert index["fm-math-001"].tier == "frontier"
+
+
+def test_load_task_index_single_manifest_default():
+    index = load_task_index(["tasks/manifest.json"])
+    assert "gsm8k-001" in index and "fm-math-001" not in index
 
 
 # -- judging pass ----------------------------------------------------------- #

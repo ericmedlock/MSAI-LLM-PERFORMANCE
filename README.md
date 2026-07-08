@@ -176,6 +176,16 @@ the respective hardware.
 > tool here. If a results dashboard is added later, Playwright E2E tests
 > belong with it.
 
+## Task tiers
+
+Tasks are tagged `baseline` (the frozen v1 suite) or `frontier`
+(architecture-favoring, harder, still objectively graded). The baseline suite is
+easy enough that the pinned model saturates it, so architectures barely differ —
+the **frontier tier** targets the difficulty band where agentic self-correction
+and swarm voting actually help. Run it with
+`--manifest tasks/frontier_manifest.json`; the analysis report shows a
+**tier × architecture** table. Design + calibration: [docs/TASK_TIERS.md](docs/TASK_TIERS.md).
+
 ## Stretch goals / future work
 
 Beyond the pre-registered study — see [docs/STRETCH_GOALS.md](docs/STRETCH_GOALS.md).

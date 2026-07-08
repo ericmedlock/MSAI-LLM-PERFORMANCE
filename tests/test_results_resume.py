@@ -8,7 +8,7 @@ from harness.results import RunRecord, append_record, completed_keys
 def _record(task_id="gsm8k-001", backend="monolithic", env="local", trial=1):
     return RunRecord(
         run_id="r", timestamp="t", backend=backend, environment=env,
-        task_id=task_id, task_domain="gsm8k", trial_idx=trial,
+        task_id=task_id, task_domain="gsm8k", task_tier="baseline", trial_idx=trial,
         model_tag="m", config_hash="h", answer="72", correct=True,
         error_category=None, latency_s=1.0, tokens_in=1, tokens_out=1,
         total_tokens=2, tokens_per_s=1.0, action_count=1,

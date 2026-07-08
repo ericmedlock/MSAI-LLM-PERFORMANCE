@@ -63,10 +63,17 @@ class Runner:
         self._clock = clock or _time.time
         self._run_id_factory = run_id_factory or (lambda: uuid.uuid4().hex)
 
-    def _write_host_profile(self, env) -> tuple[str, str]:
+    def _write_host_profile(self, env, output_path) -> tuple[str, str]:
         """Capture the static host profile once per run: write the full JSON
-        sidecar, merge the normalized hosts.csv, and return (host_id, label)
-        to stamp inline on every row."""
+        sidecar and merge the normalized hosts.csv, and return (host_id, label)
+        to stamp inline on every row.
+
+        The sidecar is written NEXT TO the run output (``output_path``'s
+        directory), not to a fixed ``config.results_dir``. This keeps an isolated
+        run (``--output results/dev/...``) — or a test writing rows to a tmp dir —
+        from rewriting the frozen ``results/host/*.json`` + ``hosts.csv``
+        provenance. A default run (output already under ``results/``) is unchanged.
+        """
         import json
         from pathlib import Path
 
@@ -82,7 +89,7 @@ class Runner:
             config_hash=self._config.config_hash,
             timestamp=_now_iso(self._clock),
         )
-        results_dir = Path(self._config.results_dir)
+        results_dir = Path(output_path).parent
         out = results_dir / "host" / f"{env.key}.json"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(profile, indent=2), encoding="utf-8")
@@ -98,7 +105,7 @@ class Runner:
     def run_plan(self, plan: RunPlan, output_path: str | Path) -> int:
         """Execute a plan, appending rows. Returns the number of NEW rows written."""
         env = self._config.env(plan.environment).resolved()
-        self._host_id, self._host_label = self._write_host_profile(env)
+        self._host_id, self._host_label = self._write_host_profile(env, output_path)
         done = completed_keys(output_path)
         backends = self._build_backends(plan.backends)
         written = 0
@@ -160,8 +167,9 @@ class Runner:
             environment=environment,
             task_id=task.task_id,
             task_domain=task.domain,
+            task_tier=task.tier,
             trial_idx=trial_idx,
-            model_tag=self._config.model.tag,
+            model_tag=self._config.model.resolved().tag,
             config_hash=self._config.config_hash,
             provider=env.provider,
             provider_model_id=env.model,
