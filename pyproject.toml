@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llm-arch-benchmark"
-version = "0.2.0"
+version = "0.2.1"
 description = "Controlled benchmark of monolithic / agentic / swarm LLM execution architectures"
 requires-python = ">=3.11"
 
