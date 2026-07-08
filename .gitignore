@@ -181,3 +181,6 @@ cython_debug/
 .cursorindexingignore
 # macOS "file 2" duplicates of coverage artifacts
 .coverage*
+
+# dev/prototyping sweeps (throwaway; not pre-registered data)
+results/dev/

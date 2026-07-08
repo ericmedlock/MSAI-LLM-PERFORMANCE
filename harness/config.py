@@ -27,6 +27,22 @@ class ModelConfig:
     quantization: str
     digest: str  # pinned from `ollama show <tag>` at freeze; provenance check
 
+    def resolved(self, environ: dict[str, str] | None = None) -> "ModelConfig":
+        """Apply per-machine overrides (.env → os.environ).
+
+        The canonical model identity is pinned in config, but a dev/prototyping
+        box may serve a *different* model than the frozen one (see
+        ``EnvironmentConfig.resolved``). ``MODEL_TAG`` / ``MODEL_QUANT`` override
+        the canonical identity so dev rows and reports are labeled with what
+        actually ran, not the frozen tag. Leave unset for pre-registered runs.
+        """
+        environ = os.environ if environ is None else environ
+        return replace(
+            self,
+            tag=environ.get("MODEL_TAG", self.tag),
+            quantization=environ.get("MODEL_QUANT", self.quantization),
+        )
+
 
 @dataclass(frozen=True)
 class DecodingConfig:

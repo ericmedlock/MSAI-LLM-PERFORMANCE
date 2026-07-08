@@ -162,7 +162,7 @@ class Runner:
             task_domain=task.domain,
             task_tier=task.tier,
             trial_idx=trial_idx,
-            model_tag=self._config.model.tag,
+            model_tag=self._config.model.resolved().tag,
             config_hash=self._config.config_hash,
             provider=env.provider,
             provider_model_id=env.model,

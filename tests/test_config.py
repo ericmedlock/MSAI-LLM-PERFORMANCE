@@ -43,6 +43,14 @@ def test_env_overrides_from_environment_variables(config):
     assert config.env("local").resolved({}).base_url == "http://localhost:1234/v1"
 
 
+def test_model_label_overrides_for_dev_but_defaults_to_pinned(config):
+    # a dev box serving a different model overrides the canonical label
+    m = config.model.resolved({"MODEL_TAG": "gemma-4-e4b", "MODEL_QUANT": "Q4"})
+    assert m.tag == "gemma-4-e4b" and m.quantization == "Q4"
+    # unset -> pinned identity from config.yaml is preserved (pre-registered runs)
+    assert config.model.resolved({}).tag == config.model.tag
+
+
 def test_api_key_falls_back_when_unset(config):
     assert config.env("local").api_key({}) == "lm-studio"
     assert config.env("local").api_key({"LLM_API_KEY": "secret"}) == "secret"

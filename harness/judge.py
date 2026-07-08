@@ -141,6 +141,23 @@ def _append_judge(path: str, record: JudgeRecord) -> None:
         os.fsync(fh.fileno())
 
 
+def load_task_index(manifests: list[str]) -> dict[str, Task]:
+    """Merge one or more task manifests into a ``task_id -> Task`` index.
+
+    The judge needs each row's gold answer/tests to build its prompt. Rows can
+    span tiers (baseline + frontier), which live in separate manifests, so the
+    judge must be able to load more than one — otherwise frontier rows are
+    judged with no gold context. Later manifests win on id collision.
+    """
+    from harness.task_loader import load_tasks
+
+    index: dict[str, Task] = {}
+    for manifest in manifests:
+        for task in load_tasks(manifest):
+            index[task.task_id] = task
+    return index
+
+
 # --------------------------------------------------------------------------- #
 # CLI                                                                         #
 # --------------------------------------------------------------------------- #
@@ -150,11 +167,17 @@ def main(argv: list[str] | None = None) -> int:
 
     from backends.factory import build_judge_client
     from harness.config import load_config, load_dotenv
-    from harness.task_loader import load_tasks
 
     parser = argparse.ArgumentParser(prog="harness.judge", description=__doc__)
     parser.add_argument("--config", default="config/config.yaml")
     parser.add_argument("--results", default="results/*.jsonl", help="run rows to judge")
+    parser.add_argument(
+        "--manifest",
+        action="append",
+        help="task manifest(s) providing gold answers/tests; repeatable. Default: "
+        "config tasks_manifest (baseline). Add tasks/frontier_manifest.json to judge "
+        "frontier rows with their gold context.",
+    )
     parser.add_argument("--output", help="judge output JSONL (default: results/judge/<env>.jsonl)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -163,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     config = load_config(args.config)
     judge = config.judge.resolved()
     judge_system = Path(config.judge.prompt_file).read_text(encoding="utf-8").strip()
-    tasks_by_id = {t.task_id: t for t in load_tasks(config.tasks_manifest)}
+    tasks_by_id = load_task_index(args.manifest or [config.tasks_manifest])
 
     paths = [p for p in sorted(glob.glob(args.results)) if "/judge/" not in p]
     rows: list[dict] = []

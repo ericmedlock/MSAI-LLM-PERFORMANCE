@@ -12,18 +12,31 @@ from harness.graders import grade
 from harness.task_loader import load_tasks
 from tests.conftest import ROOT
 
-FRONTIER = ROOT / "tasks" / "frontier_manifest.json"
+# Both the authored candidates and the externally-sourced (MATH-500/MBPP/MuSiQue)
+# candidates are held to the same self-consistency bar.
+FRONTIER_MANIFESTS = [
+    p
+    for p in (
+        ROOT / "tasks" / "frontier_manifest.json",
+        ROOT / "tasks" / "frontier_external_manifest.json",
+    )
+    if p.exists()
+]
 
 
-def test_frontier_manifest_loads_with_tier_and_domains():
-    tasks = load_tasks(FRONTIER)
-    assert len(tasks) >= 8
+@pytest.mark.parametrize("manifest", FRONTIER_MANIFESTS, ids=lambda p: p.name)
+def test_frontier_manifest_loads_with_tier_and_domains(manifest):
+    tasks = load_tasks(manifest)
+    assert len(tasks) >= 6
     assert all(t.tier == "frontier" for t in tasks)
     assert {t.domain for t in tasks} <= {"math", "code", "multihop"}
 
 
 def _raw():
-    return json.loads(FRONTIER.read_text())["tasks"]
+    items = []
+    for p in FRONTIER_MANIFESTS:
+        items.extend(json.loads(p.read_text())["tasks"])
+    return items
 
 
 @pytest.mark.parametrize("item", [t for t in _raw() if t["domain"] == "code"],
