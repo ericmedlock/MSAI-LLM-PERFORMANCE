@@ -28,6 +28,20 @@ def _runner(config, prompts, responder):
     )
 
 
+def test_host_profile_written_beside_output_not_frozen_results(config, prompts, tmp_path, monkeypatch):
+    # Provenance sidecar must follow the output path (co-located), never rewrite
+    # the frozen results/host/*.json + hosts.csv. Regression for the isolation bug.
+    import harness.hostinfo as hostinfo
+
+    monkeypatch.setattr(hostinfo, "_loaded_models", lambda provider, base_url: ["m1"])
+    out = tmp_path / "local.jsonl"
+    runner = _runner(config, prompts, lambda s, u, seed: "72")
+    runner.run_plan(RunPlan("local", ["monolithic"], TASKS[:1], trials=1), out)
+
+    assert (tmp_path / "host" / "local.json").exists()   # sidecar beside the output
+    assert (tmp_path / "hosts.csv").exists()
+
+
 def test_run_plan_writes_n_rows_per_cell_and_grades(config, prompts, tmp_path):
     out = tmp_path / "local.jsonl"
     # correct answer for both tasks
