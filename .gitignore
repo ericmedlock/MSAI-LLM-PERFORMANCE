@@ -184,3 +184,7 @@ cython_debug/
 
 # dev/prototyping sweeps (throwaway; not pre-registered data)
 results/dev/
+
+# macOS Finder cruft
+.DS_Store
+**/.DS_Store
