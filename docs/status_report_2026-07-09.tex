@@ -1,0 +1,213 @@
+\documentclass[sigconf,nonacm]{acmart}
+
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\usepackage{booktabs}
+\emergencystretch=3em
+\hbadness=10000
+\sloppy
+
+\begin{document}
+
+\title{Calibrating a Frontier Task Tier for Architecture-Sensitive LLM Benchmarking}
+\subtitle{Status Report II --- baseline results, full-size probe, and the frozen frontier-v2 tier}
+
+\author{Eric Medlock}
+\affiliation{%
+  \institution{University of North Carolina at Charlotte}
+  \department{ITCS 6881 Independent Study}
+  \city{Charlotte}
+  \state{North Carolina}
+  \country{USA}
+}
+\email{emedlock@charlotte.edu}
+
+\begin{abstract}
+The pre-registered study compares monolithic, agentic (Executor+Verifier), and swarm
+(3-peer majority vote) LLM execution architectures under pinned model, prompts, and
+decoding. The v1 baseline (225 runs, frozen 2026-07-01) saturated: the pinned 14B model
+solves the classic benchmark items nearly perfectly, leaving architectures nothing to
+differentiate on. This report documents the construction and calibration of a
+\emph{frontier tier} --- tasks selected so that monolithic single-pass accuracy lands in
+the 0.4--0.7 band where iteration and voting can matter. A 330-run full-size probe
+(DeepSeek-R1-distill 32B) exposed both failure directions: MBPP code items saturated
+(100\%) while closed-book MuSiQue floored (6\%), and no architecture rescued the floor.
+A three-round calibration campaign (350 monolithic runs at the pinned 14B) re-sourced
+math to AIME~2025 (42\%), code to BigCodeBench-Hard (48\%), and multihop to MuSiQue
+\emph{with} supporting passages (67\%); the resulting 36-item tier is frozen. Two
+methodological findings fell out: per-item accuracy is near-binary under temperature-0
+decoding (forcing the calibration band to the domain aggregate), and 47\% of frontier
+failures are output-budget exhaustion rather than wrong reasoning. Two empirical
+surprises: the 14B distill \emph{outperforms} its 32B sibling on the same MATH-500 slice
+(88\% vs.\ 65\%), and on floored knowledge tasks agentic/swarm wrappers scored
+\emph{zero} where monolithic scraped 17\%. The confirmatory tier$\times$architecture
+sweep now moves to university HPC.
+\end{abstract}
+
+\maketitle
+
+\section{Context}
+Design, hypotheses (task-dependent superiority, ``candidate~D''), conditions, and
+metrics are frozen in \texttt{PRE\_REGISTRATION.md} (2026-07-01 07:31 EDT); every
+deviation since is in its Amendment Log. Architecture is the only variable: one pinned
+model (DeepSeek-R1 14B distill, Q4\_K\_M, digest recorded), frozen prompts, temperature
+0.0, fixed seed, $n_{ctx}=8192$, max output 6144 tokens, $N=5$ trials per cell. The
+harness grades binarily and automatically (exact numeric / unit tests / normalized
+string), writes one crash-safe JSONL row per run, and is idempotent.
+
+\section{v1 baseline (frozen 2026-07-01)}
+225 runs: 15 items (5 GSM8K / 5 HumanEval / 5 HotpotQA) $\times$ 3 architectures
+$\times$ $N{=}5$, local cell (Apple M5 Max, LM Studio/Metal).
+
+\begin{table}[h]
+\caption{v1 baseline, all 15 items (mean$\pm$std across runs).}
+\label{tab:v1}
+\begin{tabular}{lrrrr}
+\toprule
+Architecture & Acc. & Latency (s) & Tokens & tok/s\\
+\midrule
+Monolithic & 93\% & $15.2\pm17.5$ & $832\pm850$ & 44.9\\
+Agentic    & \textbf{100\%} & $32.5\pm32.0$ & $1961\pm1662$ & 44.5\\
+Swarm      & 93\% & $32.9\pm33.1$ & $2649\pm2247$ & 63.0\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The agentic verifier fixed every monolithic error (notably the one item all
+single-pass runs missed), at $\sim$2.4$\times$ token cost; the swarm's parallel peers
+raised throughput (63 tok/s) but its majority vote failed exactly where peers agreed on
+the same wrong answer. The problem is the 93--100\% ceiling itself: with at most one
+hard item, the design cannot observe the \emph{task-dependent} effects it
+pre-registered. Hence the frontier tier: a second, harder task class kept objectively
+auto-graded, selected by a pre-declared empirical rule --- monolithic single-pass
+accuracy in $[0.4, 0.7]$ --- the band where self-correction and voting have room to act.
+
+\section{Full-size probe: three regimes}
+Before calibrating at the pinned 14B, the 22 externally-sourced candidates
+(MATH-500 L$\geq$3 / MBPP-sanitized / closed-book MuSiQue) were probed at full size:
+DeepSeek-R1-distill-\textbf{32B}, all three architectures, $N{=}5$ --- 330 runs
+($\sim$14\,h). The probe exposed both failure directions at once
+(Table~\ref{tab:probe}).
+
+\begin{table}[h]
+\caption{32B probe: accuracy by domain $\times$ architecture.}
+\label{tab:probe}
+\begin{tabular}{lrrrl}
+\toprule
+Domain & Mono & Agentic & Swarm & Verdict\\
+\midrule
+Math (MATH-500)        & 70\% & 63\% & 63\% & in band\\
+Code (MBPP)            & 100\% & 100\% & 100\% & \textbf{ceiling}\\
+Multihop (closed-book) & 17\% & 0\% & 0\% & \textbf{floor}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two observations survive any later analysis. First, \emph{architecture cannot
+substitute for knowledge}: closed-book MuSiQue asks for facts the model does not hold,
+and iterating or voting over ignorance produced strictly \emph{worse} results than a
+single pass (0/60 vs.\ 5/30) --- the verifier ``corrects'' toward confident
+hallucinations, and peers vote on shared ones. Second, on the one in-band domain
+(math), monolithic \emph{beat} both wrappers at 32B (70\% vs.\ 63\%) --- an early,
+exploratory contradiction of the hypothesis's direction that the confirmatory 14B sweep
+will test properly. Mean cost ordering matched pre-registration sub-prediction~1:
+1610 / 2706 / 2884 tokens per run (mono/agentic/swarm).
+
+\section{Calibration campaign and freeze}
+Calibration ran monolithic-only, $N{=}5$, against the \emph{pinned 14B} (the model
+under test). Three rounds, 350 runs total (Table~\ref{tab:calib}).
+
+\begin{table}[h]
+\caption{Domain aggregates per calibration round (pinned 14B). Bold = in band, frozen.}
+\label{tab:calib}
+\begin{tabular}{llrl}
+\toprule
+Round & Domain source & Agg. & Action\\
+\midrule
+1 & MATH-500 L3--5 mix        & 88\% & re-source harder\\
+1 & BigCodeBench (stdlib)     & 89\% & re-source harder\\
+1 & MuSiQue + context         & \textbf{67\%} & \textbf{freeze}\\
+2 & MATH-500 L5-only          & 80\% & re-source harder\\
+2 & BigCodeBench-\textbf{Hard} & \textbf{48\%} & \textbf{freeze}\\
+3 & \textbf{AIME 2025}        & \textbf{42\%} & \textbf{freeze}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two amendments shaped the rules (both logged before the affected runs):
+
+\textbf{Per-item binarity $\rightarrow$ domain-aggregate band.} Under temperature 0.0
+with a fixed seed, the five trials of an item are near-identical: observed per-item
+accuracies were 5/5 or 0/5 in 66 of 68 item-round combinations. A per-item 0.4--0.7
+band is therefore unsatisfiable as written; the band was restated at the domain
+aggregate, with whole-domain re-sourcing from pre-declared harder tiers
+(MATH-500 $\rightarrow$ L5 $\rightarrow$ AIME~2025; BCB $\rightarrow$ BCB-Hard) and an
+explicit prohibition on item-level outcome selection.
+
+\textbf{Provided context for multihop.} MuSiQue is calibrated upstream as reading
+comprehension; serving it closed-book turns it into a parametric-recall lottery (the
+32B floor). v2 supplies the supporting passages plus distractors within a fixed
+context budget, making the domain reasoning-bound. It calibrated to 67\% immediately.
+
+The frozen tier (\texttt{tasks/frontier\_v2\_manifest.json}, 2026-07-09): 12 AIME~2025
+math items (42\%), 12 BigCodeBench-Hard code items (48\%), 12 MuSiQue-with-context
+multihop items (67\%); tier aggregate 52\%. Every domain contains genuinely solved and
+genuinely unsolved items --- the property the tier$\times$architecture analysis needs.
+AIME~2025 additionally post-dates the pinned model's training, removing the
+data-contamination concern the MATH-500 items carry.
+
+\section{Failure taxonomy at the frontier}
+Of the 86 incorrect rows in the frozen tier's calibration, 46 are reasoning errors but
+\textbf{40 (47\%) are output-budget exhaustions}: the model consumed all 6144 output
+tokens on chain-of-thought and was truncated before emitting any final answer. (The
+same mechanism forced the 2048$\rightarrow$6144 amendment during the v1 pilot; at
+frontier difficulty it recurs at 6144.) This matters for interpretation: part of what
+``too hard for the pinned model'' \emph{means} under a fixed budget is
+``cannot finish reasoning in time.'' It is also an architecture-relevant mechanism ---
+whether a verifier retry or a differently-seeded peer can land an answer inside the
+budget where a single pass cannot is precisely a tier$\times$architecture question.
+
+\section{Findings so far}
+\begin{enumerate}
+\item \textbf{Baseline saturation is real and model-size-robust}: classic items
+(GSM8K/HumanEval/MBPP-class) are ceiling-level for both 14B and 32B; architecture
+comparisons on such suites measure noise.
+\item \textbf{Capability is not monotonic in scale per-domain}: the 14B distill scored
+88\% on the same MATH-500 slice where the 32B scored 65\%, while the 32B was far
+stronger on closed-book recall (its 6\% floor still beat the 14B's expected zero).
+Difficulty bands are model-relative; tiers must be calibrated per model.
+\item \textbf{Architecture cannot fix missing knowledge}, and can amplify its absence
+(0\% agentic/swarm vs.\ 17\% mono on the floored domain).
+\item \textbf{Budget exhaustion is a first-class failure mode} at frontier difficulty
+(47\% of failures), distinct from wrong reasoning and reportable separately.
+\item (Exploratory) \textbf{monolithic led both wrappers on in-band math at 32B};
+whether this holds at the pinned 14B is exactly what the confirmatory sweep tests.
+\end{enumerate}
+
+\section{Threats to validity}
+Single model family (DeepSeek-R1 distills) and single environment so far (Metal/LM
+Studio; the pre-registered cloud cell is pending). Domain-aggregate calibration keeps
+selection mechanical but leaves per-domain aggregates at different band positions (42
+/ 48 / 67\%), so cross-domain accuracy comparisons remain descriptive. AIME~2025
+avoids contamination, but BigCodeBench-Hard and MuSiQue pre-date the model's cutoff.
+$N{=}5$ under near-deterministic decoding characterizes serving jitter, not sampling
+variance. The 32B architecture observations use uncalibrated v1-candidate items and
+are exploratory only.
+
+\section{Next steps}
+(1)~Confirmatory sweep on university HPC: frozen tier $\times$ 3 architectures
+$\times$ $N{=}5$ at the pinned 14B (monolithic rows seeded from calibration), per
+\texttt{docs/HPC\_RUNBOOK.md}; (2)~exploratory scaling legs (32B, Qwen3.6-35B-A3B) at
+$N{=}2$; (3)~LLM-as-judge secondary pass (Llama-3.2-3B); (4)~the pre-registered Azure
+cloud cell; (5)~future work: a tool-equipped v2 study arm where GAIA-style tasks
+become applicable --- rejected for the current tier because it benchmarks tool
+orchestration, which the no-tool design deliberately excludes.
+
+\vspace{1em}
+\noindent\textit{All raw rows, calibration evidence, amendments, and scripts are
+committed; every figure and table in this report is reproducible from
+\texttt{results/} at the repository head.}
+
+\end{document}
