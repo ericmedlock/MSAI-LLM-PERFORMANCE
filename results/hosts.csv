@@ -1,2 +1,3 @@
 host_id,hostname,environment,runtime,chip,machine_model,cpu_cores,total_ram_gb,gpu_model,gpu_cores,total_vram_gb,unified_memory,os,python,provider,base_url,backend_model,judge_model,config_hash
 3bb388800afb,Erics-MacBook-Air.local,local,metal,Apple M5 Max,"Mac17,6",18,48,Apple M5 Max,40,48,True,macOS-26.5.1-arm64-arm-64bit-Mach-O,3.13.11,openai,http://localhost:1234/v1,foo-14b,llama-3.2-3b-instruct,dc043df42821d85d
+752b2eccda28,Erics-MacBook.local,local,metal,Apple M5 Max,"Mac17,6",18,48,Apple M5 Max,40,48,True,macOS-26.5.1-arm64-arm-64bit-Mach-O,3.13.11,openai,http://localhost:1234/v1,deepseek-r1-distill-qwen-32b,llama-3.2-3b-instruct,dc043df42821d85d
