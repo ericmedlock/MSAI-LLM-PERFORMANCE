@@ -21,7 +21,7 @@ constant and live in [`config/config.yaml`](config/config.yaml), never in code.
 config/config.yaml        # all pinned values (nothing pinned is hardcoded)
 prompts/                  # version-controlled system prompts, frozen after pilot
   monolithic/ agentic/ swarm/
-tasks/manifest.json       # 9 frozen items (3 GSM8K / 3 HumanEval / 3 HotpotQA)
+tasks/manifest.json       # 15 frozen items (5 GSM8K / 5 HumanEval / 5 HotpotQA)
 backends/
   base.py                 # Backend ABC + BackendResult + Task (the shared contract)
   llm_client.py           # LLMClient protocol + pinned OllamaClient
@@ -121,7 +121,7 @@ and keeping them separate keeps raw run data immutable):
 ./.venv/bin/python -m harness.run --task-id gsm8k-004 --trials 5
 
 # Phase 2 — judge the recorded answers (writes results/judge/<env>.jsonl)
-./.venv/bin/python -m harness.judge          # uses Gemma; see config `judge:`
+./.venv/bin/python -m harness.judge          # uses Llama-3.2-3B; see config `judge:`
 
 # Phase 3 — analyze (joins judge rows in automatically)
 ./.venv/bin/python -m harness.analyze --charts
@@ -130,8 +130,9 @@ and keeping them separate keeps raw run data immutable):
 - **Primary metric stays the binary auto-grader** (exact numeric / unit-test /
   normalized-string). The judge is a **secondary** quality score (0–4) plus an
   independent correctness opinion, and an *agreement-with-auto-grader* rate.
-- The judge model is a **different family** (Gemma) from the Qwen-based backend
-  to avoid a model rewarding its own family. Override with `JUDGE_MODEL` etc.
+- The judge model is a **different family** (Llama-3.2-3B-Instruct) from the
+  Qwen-based backend to avoid a model rewarding its own family (Gemma was the
+  original pick but proved too slow on the M5 Max). Override with `JUDGE_MODEL` etc.
 - Judge rows live in `results/judge/` keyed by `run_id`; the raw run rows are
   never modified. Both phases are idempotent/resumable.
 
