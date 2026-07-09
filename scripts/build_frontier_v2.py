@@ -154,32 +154,40 @@ def build_multihop(target=12):
     return out
 
 
-# ------- math: MATH-500 LEVEL 5 ONLY (recalibration 2026-07-09) ----------------- #
-# The carried L3-5 mix scored 88% at 14B (above band); the mechanical harder
-# tier is competition level 5 only, integer answers, same validation.
-def build_math_l5(target=10):
+# ------- math: AIME 2025 (round-3 re-source, 2026-07-09) ------------------------ #
+# MATH-500 L3-5 mix scored 88% and L5-only 80% at 14B (both above band); the
+# next pre-declared rung is AIME 2025 — olympiad-qualifier difficulty, integer
+# answers (0-999 by construction), post-dates the pinned model's training.
+def build_math_aime(target=12):
     out = []
-    for off in range(0, 500, 100):
-        for r in fetch("HuggingFaceH4/MATH-500", "default", "test", off):
-            ans = str(r["answer"]).strip()
-            if not re.fullmatch(r"-?\d+", ans):
-                continue
-            if int(r.get("level", 0)) != 5:
-                continue
-            prompt = (r["problem"].strip() +
-                      "\n\nGive the final answer as a single integer on the last line.")
-            if not validate_answer("math", prompt, ans):
-                continue
-            out.append({
-                "task_id": f"fx2-mathL5-{len(out)+1:03d}", "domain": "math", "tier": "frontier",
-                "source_id": f"MATH-500:{r['unique_id']}", "id_status": "CANDIDATE_UNCALIBRATED",
-                "selection_reason": (f"MATH competition LEVEL 5 ({r['subject']}); the L3-5 mix scored "
-                                     "88% at 14B (above band, 2026-07-09)."),
-                "prompt": prompt, "answer": ans, "grading": {},
-            })
-            if len(out) >= target:
-                return out
+    for r in fetch("math-ai/aime25", "default", "test", 0):
+        ans = str(r["answer"]).strip()
+        if not re.fullmatch(r"-?\d+", ans):
+            continue
+        prompt = (r["problem"].strip() +
+                  "\n\nGive the final answer as a single integer on the last line.")
+        if not validate_answer("math", prompt, ans):
+            continue
+        out.append({
+            "task_id": f"fx2-mathA-{len(out)+1:03d}", "domain": "math", "tier": "frontier",
+            "source_id": f"aime25:{r['id']}", "id_status": "CANDIDATE_UNCALIBRATED",
+            "selection_reason": ("AIME 2025 problem (integer answer; post-dates model training). "
+                                 "MATH-500 L3-5 scored 88% and L5-only 80% at 14B (above band, 2026-07-09)."),
+            "prompt": prompt, "answer": ans, "grading": {},
+        })
+        if len(out) >= target:
+            return out
     return out
+
+
+# ------- code: carry the in-band BigCodeBench-Hard items ------------------------ #
+def carry_code():
+    prev = json.load(open("tasks/frontier_v2_manifest.json"))
+    items = [t for t in prev["tasks"] if t["domain"] == "code"]
+    for t in items:
+        if "in band" not in t["selection_reason"]:
+            t["selection_reason"] += " Domain in band (48%) at 14B calibration round 2, 2026-07-09."
+    return items
 
 
 # ------- multihop: carry the 12 already-calibrated in-band items ----------------- #
@@ -192,7 +200,7 @@ def carry_hop():
     return items
 
 
-math_items, code_items, hop_items = build_math_l5(), build_code(), carry_hop()
+math_items, code_items, hop_items = build_math_aime(), carry_code(), carry_hop()
 tasks = math_items + code_items + hop_items
 manifest = {
     "_comment": ("FRONTIER TIER v2.1 — second calibration round (2026-07-09). Round 1 at the pinned 14B: "
