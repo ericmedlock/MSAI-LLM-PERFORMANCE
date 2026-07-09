@@ -38,6 +38,12 @@ STDLIB_OK = {
     "random", "itertools", "collections", "math", "re", "string", "functools",
     "operator", "datetime", "time", "json", "csv", "os", "heapq", "bisect",
     "statistics", "copy", "textwrap", "unicodedata", "hashlib", "base64",
+    # broadened 2026-07-09 for the BigCodeBench-Hard re-source (all stdlib;
+    # subprocess deliberately excluded to keep grader runs hermetic)
+    "sys", "glob", "shutil", "pathlib", "io", "struct", "binascii", "codecs",
+    "html", "urllib", "queue", "threading", "pickle", "sqlite3", "zlib",
+    "gzip", "tarfile", "zipfile", "secrets", "uuid", "calendar", "decimal",
+    "fractions",
 }
 
 
@@ -70,11 +76,13 @@ def check(candidate):
 """
 
 
-# ------- code: BigCodeBench v0.1.4, stdlib-only, unittest suites --------------- #
-def build_code(target=16):
+# ------- code: BigCodeBench-HARD v0.1.4, stdlib-only, unittest suites ---------- #
+# Recalibration 2026-07-09: the plain-BCB stdlib slice scored 89% at 14B (above
+# band), so code re-sources to the upstream-curated HARD subset (148 items).
+def build_code(target=12):
     out = []
-    for off in range(0, 600, 100):
-        for r in fetch("bigcode/bigcodebench", "default", "v0.1.4", off):
+    for off in range(0, 200, 100):
+        for r in fetch("bigcode/bigcodebench-hard", "default", "v0.1.4", off):
             raw_libs = r.get("libs") or "[]"
             libs = ast.literal_eval(raw_libs) if isinstance(raw_libs, str) else list(raw_libs)
             if not set(libs) <= STDLIB_OK:
@@ -88,11 +96,12 @@ def build_code(target=16):
                       "(with any needed imports) in a single ```python code block.\n\n"
                       + r["complete_prompt"].strip())
             out.append({
-                "task_id": f"fx2-code-{len(out)+1:03d}", "domain": "code", "tier": "frontier",
-                "source_id": f"bigcodebench-v0.1.4:{r['task_id']}",
+                "task_id": f"fx2-codeH-{len(out)+1:03d}", "domain": "code", "tier": "frontier",
+                "source_id": f"bigcodebench-hard-v0.1.4:{r['task_id']}",
                 "id_status": "CANDIDATE_UNCALIBRATED",
-                "selection_reason": (f"BigCodeBench item (libs: {', '.join(libs) or 'none'}); "
-                                     "harder than MBPP, which saturated (120/120) at 32B on 2026-07-09."),
+                "selection_reason": (f"BigCodeBench-HARD item (libs: {', '.join(libs) or 'none'}); "
+                                     "plain-BCB stdlib slice scored 89% at 14B (above band, 2026-07-09), "
+                                     "MBPP before it saturated at 32B."),
                 "prompt": prompt, "answer": None,
                 "reference_solution": reference,
                 "grading": {"entry_point": r["entry_point"], "test": test_src},
@@ -145,26 +154,55 @@ def build_multihop(target=12):
     return out
 
 
-# ------- math: carry over the in-band MATH-500 items unchanged ------------------ #
-def carry_math():
-    prev = json.load(open("tasks/frontier_external_manifest.json"))
-    items = [t for t in prev["tasks"] if t["domain"] == "math"]
+# ------- math: MATH-500 LEVEL 5 ONLY (recalibration 2026-07-09) ----------------- #
+# The carried L3-5 mix scored 88% at 14B (above band); the mechanical harder
+# tier is competition level 5 only, integer answers, same validation.
+def build_math_l5(target=10):
+    out = []
+    for off in range(0, 500, 100):
+        for r in fetch("HuggingFaceH4/MATH-500", "default", "test", off):
+            ans = str(r["answer"]).strip()
+            if not re.fullmatch(r"-?\d+", ans):
+                continue
+            if int(r.get("level", 0)) != 5:
+                continue
+            prompt = (r["problem"].strip() +
+                      "\n\nGive the final answer as a single integer on the last line.")
+            if not validate_answer("math", prompt, ans):
+                continue
+            out.append({
+                "task_id": f"fx2-mathL5-{len(out)+1:03d}", "domain": "math", "tier": "frontier",
+                "source_id": f"MATH-500:{r['unique_id']}", "id_status": "CANDIDATE_UNCALIBRATED",
+                "selection_reason": (f"MATH competition LEVEL 5 ({r['subject']}); the L3-5 mix scored "
+                                     "88% at 14B (above band, 2026-07-09)."),
+                "prompt": prompt, "answer": ans, "grading": {},
+            })
+            if len(out) >= target:
+                return out
+    return out
+
+
+# ------- multihop: carry the 12 already-calibrated in-band items ----------------- #
+def carry_hop():
+    prev = json.load(open("tasks/frontier_v2_manifest.json"))
+    items = [t for t in prev["tasks"] if t["domain"] == "multihop"]
     for t in items:
-        t["selection_reason"] += " Carried into v2 unchanged: in band (65%) at 32B on 2026-07-09."
+        if "in band" not in t["selection_reason"]:
+            t["selection_reason"] += " Domain in band (67%) at 14B calibration 2026-07-09."
     return items
 
 
-math_items, code_items, hop_items = carry_math(), build_code(), build_multihop()
+math_items, code_items, hop_items = build_math_l5(), build_code(), carry_hop()
 tasks = math_items + code_items + hop_items
 manifest = {
-    "_comment": ("FRONTIER TIER v2 — recalibrated candidates (2026-07-09). Fixes from the v1 external "
-                 "set's full-size system test: code source MBPP->BigCodeBench (stdlib-only; MBPP "
-                 "saturated 100% at 32B), multihop MuSiQue closed-book -> WITH supporting passages "
-                 "(closed-book floored at 0%; upstream calibration assumes provided context), math "
-                 "carried over (in band). All items self-grade through the real grader. "
-                 "CANDIDATE_UNCALIBRATED until the monolithic N=5 pre-pass on the PINNED model keeps "
-                 "items with single-pass accuracy in ~[0.4,0.7]; out-of-band items are dropped, not "
-                 "tuned (pre-registered criterion). See PRE_REGISTRATION.md Amendment Log + docs/TASK_TIERS.md."),
+    "_comment": ("FRONTIER TIER v2.1 — second calibration round (2026-07-09). Round 1 at the pinned 14B: "
+                 "multihop (MuSiQue WITH context) IN BAND at 67% -> carried; math (MATH-500 L3-5 mix) 88% "
+                 "and code (plain BigCodeBench stdlib slice) 89% ABOVE band -> re-sourced mechanically to "
+                 "MATH-500 LEVEL-5-only and BigCodeBench-HARD (stdlib-only). Band rule applies at the "
+                 "DOMAIN AGGREGATE (pinned temp-0 decoding makes per-item accuracy near-binary, so a "
+                 "per-item 0.4-0.7 band is unsatisfiable; see Amendment Log 2026-07-09). Whole domains "
+                 "are re-sourced from pre-declared harder/easier tiers - never item-level cherry-picking. "
+                 "All items self-grade through the real grader. See docs/TASK_TIERS.md."),
     "tier": "frontier", "frozen": False, "frozen_on": None,
     "calibration_status": "CANDIDATE_UNCALIBRATED",
     "tasks": tasks,
