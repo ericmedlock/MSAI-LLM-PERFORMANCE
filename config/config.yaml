@@ -16,7 +16,10 @@ model:
   # recorded on every telemetry row so cells stay comparable.
   tag: "deepseek-r1-14b-distill-q4_k_m"
   quantization: "Q4_K_M"
-  digest: ""                       # fill from the serving runtime at freeze
+  digest: "sha256:4b90205bacb6938e72196dbb84cd2a79987b2f93efc270496832963e8d0f56af"
+  # ^ sha256 of DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf (LM Studio artifact).
+  # Filled 2026-07-09 (Amendment Log); v1-freeze rows carry the earlier
+  # config_hash computed while this field was empty.
 
 decoding:
   temperature: 0.0                 # pinned for determinism (see pre-reg S5 tension)
