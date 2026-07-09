@@ -188,3 +188,6 @@ results/dev/
 # macOS Finder cruft
 .DS_Store
 **/.DS_Store
+
+# foreign tool output — never research data
+output/
