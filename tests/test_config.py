@@ -23,11 +23,17 @@ def test_pinned_values_match_preregistration(config):
 
 
 def test_both_environments_defined(config):
-    assert set(config.environments) == {"local", "cloud"}
+    # The two PRE-REGISTERED cells must always exist; additional compute
+    # environments (shadow trial, HPC) are allowed on top (2026-07-10).
+    assert {"local", "cloud"} <= set(config.environments)
     local, cloud = config.env("local"), config.env("cloud")
     assert local.runtime == "metal" and local.provider == "openai"   # LM Studio
     assert local.base_url == "http://localhost:1234/v1"
     assert cloud.runtime == "cuda" and cloud.provider == "ollama"
+    # every extra environment must still be fully specified for the harness
+    for key in set(config.environments) - {"local", "cloud"}:
+        extra = config.env(key)
+        assert extra.provider in {"openai", "ollama"} and extra.base_url
     # default resolves to the active environment
     assert config.env().key == config.active_environment
 

@@ -69,6 +69,25 @@ environments:
     model: "deepseek-r1:14b"                 # Ollama tag
     api_key_env: LLM_API_KEY
     runtime: cuda
+  shadow:
+    name: "Shadow Power Pro (RTX A4500 24GB, CUDA) — Ollama"
+    provider: ollama
+    base_url: "http://localhost:11434"
+    model: "deepseek-r1:14b"                 # Ollama tag (same artifact family as cloud)
+    api_key_env: LLM_API_KEY
+    runtime: cuda
+    # Trial/rehearsal environment (pre-reg lists Shadow as out-of-scope for the
+    # study cells): validates the CUDA/NVML telemetry path and the Ollama
+    # provider ahead of the HPC + Azure runs. Rows are stamped environment=shadow.
+  hpc:
+    name: "UNCC Research HPC (CUDA) — Ollama"
+    provider: ollama
+    base_url: "http://localhost:11434"
+    model: "deepseek-r1:14b"                 # Ollama tag
+    api_key_env: LLM_API_KEY
+    runtime: cuda
+    # Compute environment for the frontier confirmatory sweep + scaling legs
+    # (docs/HPC_RUNBOOK.md). Rows are stamped environment=hpc.
 
 # LLM-as-judge: a SECONDARY quality metric produced by a post-processing pass
 # (harness.judge) AFTER all benchmark runs are recorded. Binary auto-grading
