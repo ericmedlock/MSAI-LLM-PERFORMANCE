@@ -1,0 +1,320 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{amssymb}
+\usepackage{parskip}
+
+\definecolor{cmdbg}{gray}{0.93}
+\newcommand{\cmd}[1]{\colorbox{cmdbg}{\texttt{#1}}}
+\newenvironment{cmdblock}{\begin{quote}\small\begin{ttfamily}}{\end{ttfamily}\end{quote}}
+\newcommand{\checkbox}{$\square$~}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Shadow PC Trial Guide}
+\fancyhead[R]{\small MSAI-LLM-PERFORMANCE}
+\fancyfoot[C]{\small Page \thepage}
+
+\title{Shadow PC Trial --- Complete Setup \& Run Guide\\
+\large From a blank Shadow.tech Windows PC to committed benchmark data\\
+\normalsize Repository: \texttt{github.com/ericmedlock/MSAI-LLM-PERFORMANCE} \quad Guide version: 2026-07-10}
+\author{ITCS 6881 --- LLM Execution Architecture Benchmark}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\section*{What this guide does}
+
+By the end you will have: (1) a Shadow PC with all tooling installed, (2) a
+completed \emph{frontier-v2 trial} --- 36 frozen benchmark tasks $\times$ 3
+architectures $\times$ 1 trial $=$ \textbf{108 benchmark runs} against the pinned
+DeepSeek-R1 14B model on the RTX A4500 --- and (3) the results committed and pushed
+back to GitHub. This is the harness's \textbf{first-ever NVIDIA/CUDA environment},
+so the trial's real purpose is validating GPU telemetry before the university HPC
+sweep. Follow the steps in order; each has a verification so you always know
+whether it worked.
+
+\textbf{Budget:} $\sim$15 minutes of installs, $\sim$10 GB of downloads,
+then 2--3 hours of unattended running. \textbf{Disk needed:} $\sim$15 GB free.
+
+\subsection*{Conventions used in this guide}
+
+\begin{itemize}
+  \item Windows has two different command windows, and it matters which one you use:
+    \begin{itemize}
+      \item \textbf{PowerShell} --- the blue Windows shell. Open it: press the
+        \textbf{Start} key, type \texttt{powershell}, press Enter.
+      \item \textbf{Git Bash} --- installed in Part 2; a Linux-style shell. Open it:
+        Start key, type \texttt{git bash}, Enter.
+    \end{itemize}
+    Every command block below is labeled \textbf{[PowerShell]} or \textbf{[Git Bash]}.
+  \item Type commands exactly as printed, then press Enter. Commands are case-sensitive
+    in Git Bash.
+  \item \checkbox marks a verification checkpoint --- confirm it before moving on.
+  \item If Windows pops a dialog asking ``Do you want to allow this app to make
+    changes?'' (a UAC prompt), click \textbf{Yes}. This happens during installs; it is expected.
+\end{itemize}
+
+\section*{Part 0 --- Before you start (Shadow-specific)}
+
+\begin{enumerate}
+  \item Connect to your Shadow PC with the Shadow client and stay connected.
+    \textbf{Important:} Shadow \emph{shuts the virtual machine down a few minutes after
+    you disconnect}. If that happens mid-run, no data is lost (every finished run is
+    saved instantly), but the benchmark stops until you reconnect and resume. Plan to
+    keep the session open for the full 2--3 hours, or check in periodically.
+  \item Check free disk space: open \textbf{File Explorer} $\rightarrow$ This PC
+    $\rightarrow$ the C: drive should show at least 15 GB free.
+  \item \checkbox You are on the Shadow desktop with a working keyboard/mouse and
+    15+ GB free.
+\end{enumerate}
+
+\section*{Part 1 --- Verify the GPU (30 seconds)}
+
+Everything depends on the NVIDIA driver being present. Shadow pre-installs it;
+verify rather than assume.
+
+\textbf{[PowerShell]}
+\begin{cmdblock}
+nvidia-smi
+\end{cmdblock}
+
+\checkbox You see a table whose header line includes \texttt{NVIDIA RTX A4500}
+and a memory column reading about \texttt{24564MiB} total.
+
+\textbf{If instead you see} ``\texttt{nvidia-smi is not recognized}'': the driver is
+missing or PATH is stale. Reboot the Shadow PC first; if it persists, update the GPU
+driver through Shadow's own updater or GeForce/NVIDIA Experience, then repeat this check.
+\textbf{Do not continue until this works} --- without the driver, the benchmark will run
+on CPU (uselessly slow) and the telemetry this trial exists to validate will be empty.
+
+\section*{Part 2 --- Install Git for Windows (2 minutes)}
+
+Git fetches the repository; the bundled \emph{Git Bash} shell is also what the
+project's scripts (and Claude Code) run in.
+
+\textbf{[PowerShell]}
+\begin{cmdblock}
+winget install --id Git.Git -e --source winget
+\end{cmdblock}
+
+Notes: \texttt{winget} is Windows' built-in package manager. If it reports
+``\texttt{winget is not recognized}'', install ``App Installer'' from the Microsoft
+Store, close and reopen PowerShell, and retry.
+
+\textbf{Close PowerShell and open a new one} (installs only appear in fresh windows).
+
+\checkbox \texttt{git --version} in the new PowerShell prints something like
+\texttt{git version 2.5x}.
+
+\section*{Part 3 --- Install Python 3.13 (2 minutes)}
+
+\textbf{[PowerShell]}
+\begin{cmdblock}
+winget install --id Python.Python.3.13 -e --source winget
+\end{cmdblock}
+
+Again close PowerShell and open a fresh one.
+
+\checkbox \texttt{python --version} prints \texttt{Python 3.13.x}.
+(If it opens the Microsoft Store instead: Start $\rightarrow$ ``Manage app execution
+aliases'' $\rightarrow$ turn \textbf{off} both \texttt{python.exe} and
+\texttt{python3.exe} aliases, then retry in a fresh window.)
+
+\section*{Part 4 --- Install Claude Code (3 minutes)}
+
+Claude Code is the AI command-line agent that will drive the whole trial for you
+(Part 6, Path A). If you prefer to run everything by hand, you may skip this part
+and use Path B --- but Path A also handles surprises for you.
+
+\textbf{[PowerShell]}
+\begin{cmdblock}
+irm https://claude.ai/install.ps1 | iex
+\end{cmdblock}
+
+Open a fresh PowerShell, run \cmd{claude}, and follow the login prompts in the
+browser window it opens (log in with the Anthropic account). Exit Claude Code
+afterwards by typing \texttt{/exit}.
+
+\checkbox \texttt{claude --version} prints a version number without error.
+
+\section*{Part 5 --- Get the repository (1 minute)}
+
+The repository is public --- no login needed to download it.
+
+\textbf{[PowerShell]}
+\begin{cmdblock}
+cd \textasciitilde \\
+git clone https://github.com/ericmedlock/MSAI-LLM-PERFORMANCE.git
+\end{cmdblock}
+
+(\texttt{\textasciitilde} means your home folder, e.g.\ \texttt{C:\textbackslash Users\textbackslash you}.)
+
+\checkbox A folder \texttt{MSAI-LLM-PERFORMANCE} now exists in your home folder and
+contains \texttt{scripts}, \texttt{tasks}, \texttt{config}, \texttt{results},
+\texttt{docs}.
+
+\section*{Part 6 --- Run the trial}
+
+\subsection*{Path A --- let Claude Code drive (recommended)}
+
+Open \textbf{Git Bash} (Start key $\rightarrow$ type \texttt{git bash} $\rightarrow$ Enter), then:
+
+\begin{cmdblock}
+cd \textasciitilde/MSAI-LLM-PERFORMANCE \\
+claude
+\end{cmdblock}
+
+When Claude Code starts, type exactly:
+
+\begin{center}
+\Large\texttt{RUN SHADOW PC TRIALS}
+\end{center}
+
+The repository ships a skill that tells Claude precisely what to do: run the setup
+script, verify the GPU telemetry in the first rows, run the trial, then summarize
+and commit the results. Approve the permission prompts it shows (they correspond to
+the exact commands in Path B below). You can ask it questions at any time
+(``how far along is it?'', ``show accuracy so far'').
+
+\subsection*{Path B --- manual (identical result, two commands)}
+
+Open \textbf{Git Bash}:
+
+\begin{cmdblock}
+cd \textasciitilde/MSAI-LLM-PERFORMANCE \\
+bash scripts/setup.sh \\
+bash scripts/run\_trials.sh
+\end{cmdblock}
+
+\subsection*{What the setup step does (either path), and what you'll see}
+
+\begin{enumerate}
+  \item Detects the platform and prints \texttt{[setup] detected profile: shadow}.
+  \item Creates a private Python environment and installs the pinned dependencies
+    ($\sim$2 min).
+  \item Runs the offline test suite --- \checkbox expect
+    \texttt{112 passed, 2 deselected}.
+  \item Installs \textbf{Ollama} (the local model server) via winget --- expect a UAC
+    prompt --- and starts it.
+  \item Downloads the pinned model \texttt{deepseek-r1:14b} ($\sim$9 GB; Shadow's
+    datacenter connection usually does this in a few minutes; a progress bar is shown).
+  \item Prints the GPU line --- \checkbox expect \texttt{NVIDIA RTX A4500, 24564 MiB}
+    and finally \texttt{[setup] DONE}.
+\end{enumerate}
+
+The run step then prints a dry-run plan --- \checkbox expect
+\texttt{Total cells : 108 runs}, writing to
+\texttt{results/frontier-v2-shadow-trial-14b.jsonl} --- and starts executing.
+One line of progress appears per finished run.
+
+\section*{Part 7 --- The five-minute telemetry check (the point of the trial)}
+
+After the first 2--3 runs finish ($\sim$5 minutes in), open a \textbf{second} Git Bash
+window and inspect the first recorded row:
+
+\begin{cmdblock}
+cd \textasciitilde/MSAI-LLM-PERFORMANCE \\
+head -n 1 results/frontier-v2-shadow-trial-14b.jsonl \textbackslash \\
+\mbox{\quad}\textbar{} ./.venv/Scripts/python -m json.tool \textbar{} grep -iE "vram\textbar gpu\textbar watt"
+\end{cmdblock}
+(The \texttt{\textbackslash} at the end of the first line lets you press Enter and
+continue the command on the next line.)
+
+\checkbox The GPU fields (\texttt{peak\_vram\_mb}, GPU utilization, power) contain
+\textbf{non-zero numbers}. This proves the CUDA/NVML telemetry path works --- the
+single most important output of this trial.
+
+\textbf{If the fields are zero/empty:} stop the run (\texttt{Ctrl-C} in the first
+window --- perfectly safe) and investigate before spending hours: is
+\texttt{nvidia-smi} still working? Did Ollama load the model onto the GPU
+(\cmd{ollama ps} should show the model with \texttt{100\% GPU})? Report what you find;
+nothing collected so far is wasted.
+
+\section*{Part 8 --- During the run}
+
+\begin{itemize}
+  \item \textbf{Duration:} roughly 2--3 hours for all 108 runs. Math items (AIME) are the
+    slowest --- several minutes each is normal; some will legitimately fail (the tier is
+    calibrated to $\sim$50\% single-pass difficulty). Failures are data, not problems.
+  \item \textbf{Interrupting is always safe.} Every finished run is written to disk
+    immediately. \texttt{Ctrl-C} stops it; re-running
+    \cmd{bash scripts/run\_trials.sh} continues exactly where it left off.
+  \item \textbf{Do not disconnect the Shadow client} (Part 0). If you must, reconnect
+    later and simply re-run the command --- it resumes.
+  \item Progress check at any time (second Git Bash window):
+\begin{cmdblock}
+wc -l results/frontier-v2-shadow-trial-14b.jsonl
+\end{cmdblock}
+    The number printed is finished runs out of 108.
+\end{itemize}
+
+\section*{Part 9 --- Send the data home}
+
+Pushing requires GitHub authentication once. The easiest route is the GitHub CLI:
+
+\textbf{[PowerShell]}
+\begin{cmdblock}
+winget install --id GitHub.cli -e --source winget
+\end{cmdblock}
+
+Then in a fresh \textbf{Git Bash}:
+\begin{cmdblock}
+gh auth login
+\end{cmdblock}
+(choose \texttt{GitHub.com} $\rightarrow$ \texttt{HTTPS} $\rightarrow$ login via
+browser), and identify yourself to git (once):
+\begin{cmdblock}
+git config --global user.name "Eric Medlock" \\
+git config --global user.email "ericmedlock@gmail.com"
+\end{cmdblock}
+
+Finally commit and push the results (Path A: Claude Code offers to do this for you):
+\begin{cmdblock}
+cd \textasciitilde/MSAI-LLM-PERFORMANCE \\
+git add results/frontier-v2-shadow-trial-14b.jsonl \\
+git add results/host/shadow.json results/hosts.csv \\
+git commit -m "data(shadow): frontier-v2 trial N=1, RTX A4500" \\
+git push
+\end{cmdblock}
+
+\checkbox \texttt{git push} ends with no error, and on the repository's GitHub
+page the new file appears under \texttt{results/}.
+
+\section*{Part 10 --- Troubleshooting quick reference}
+
+\begin{tabular}{p{2.6in}p{3.4in}}
+\textbf{Symptom} & \textbf{Fix}\\[2pt]
+\hline\\[-8pt]
+\texttt{winget} not recognized & Install ``App Installer'' from Microsoft Store; fresh PowerShell.\\[4pt]
+\texttt{git}/\texttt{python}/\texttt{claude} not recognized right after install & Close the window; open a fresh one (PATH updates only apply to new windows).\\[4pt]
+\texttt{python} opens the Microsoft Store & Start $\rightarrow$ ``Manage app execution aliases'' $\rightarrow$ disable the \texttt{python.exe} aliases.\\[4pt]
+\texttt{ollama} not recognized after setup & Fresh Git Bash window; or run \texttt{bash scripts/setup.sh} again (it is safe to repeat).\\[4pt]
+Model download very slow / stalled & \texttt{Ctrl-C} and re-run setup; Ollama resumes partial downloads.\\[4pt]
+GPU fields empty in Part 7 & See Part 7; check \texttt{ollama ps} shows \texttt{100\% GPU}; check \texttt{nvidia-smi}.\\[4pt]
+Run seems frozen on one item & AIME math items can take several minutes of silent ``thinking''; the harness also has its own timeout. Give it 10 minutes before worrying.\\[4pt]
+Shadow disconnected overnight & Reconnect, open Git Bash, \texttt{cd} to the repo, re-run \texttt{bash scripts/run\_trials.sh} --- it resumes.\\[4pt]
+\end{tabular}
+
+\vspace{1em}
+\section*{Final checklist}
+
+\begin{itemize}
+  \item \checkbox \texttt{nvidia-smi} shows the RTX A4500 \hfill (Part 1)
+  \item \checkbox Git, Python 3.13, Claude Code installed \hfill (Parts 2--4)
+  \item \checkbox Repo cloned \hfill (Part 5)
+  \item \checkbox Setup finished: 112 tests passed, model pulled, \texttt{[setup] DONE} \hfill (Part 6)
+  \item \checkbox First-row GPU telemetry is non-zero \hfill (Part 7)
+  \item \checkbox 108/108 rows in the results file \hfill (Part 8)
+  \item \checkbox Results committed and pushed to GitHub \hfill (Part 9)
+\end{itemize}
+
+\textit{Rules the scripts already enforce, stated for completeness: never edit
+\texttt{config/config.yaml}, anything in \texttt{tasks/}, or \texttt{prompts/} ---
+these are frozen by pre-registration, and the config file's bytes are hashed into
+every result row. Machine-specific overrides belong in a \texttt{.env} file only.}
+
+\end{document}
