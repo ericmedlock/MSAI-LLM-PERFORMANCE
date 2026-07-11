@@ -130,6 +130,10 @@ Claude Code is the AI command-line agent that will drive the whole trial for you
 (Part 6, Path A). If you prefer to run everything by hand, you may skip this part
 and use Path B --- but Path A also handles surprises for you.
 
+\textbf{Prerequisite:} an Anthropic account with Claude Code access --- either a
+Claude \textbf{Pro/Max subscription} or a Console account with API billing. Have
+those credentials ready before starting; the install below ends in a browser login.
+
 \textbf{[PowerShell]}
 \begin{cmdblock}
 irm https://claude.ai/install.ps1 | iex
@@ -168,16 +172,22 @@ cd \textasciitilde/MSAI-LLM-PERFORMANCE \\
 claude
 \end{cmdblock}
 
-When Claude Code starts, type exactly:
+The first time Claude Code opens in this folder it asks
+``\textbf{Do you trust the files in this folder?}'' --- answer \textbf{Yes} (you
+just cloned this repository yourself from GitHub).
+
+When Claude Code is ready, type:
 
 \begin{center}
 \Large\texttt{RUN SHADOW PC TRIALS}
 \end{center}
 
-The repository ships a skill that tells Claude precisely what to do: run the setup
-script, verify the GPU telemetry in the first rows, run the trial, then summarize
-and commit the results. Approve the permission prompts it shows (they correspond to
-the exact commands in Path B below). You can ask it questions at any time
+Exact wording is not required --- natural phrasings like ``get this machine ready
+and run the shadow eval'' trigger the same built-in instructions. The repository
+ships a skill that tells Claude precisely what to do: run the setup script, verify
+the GPU telemetry in the first rows, run the trial, then summarize and commit the
+results. Approve the permission prompts it shows (they correspond to the exact
+commands in Path B below). You can ask it questions at any time
 (``how far along is it?'', ``show accuracy so far'').
 
 \subsection*{Path B --- manual (identical result, two commands)}
