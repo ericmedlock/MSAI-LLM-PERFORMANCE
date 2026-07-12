@@ -15,7 +15,7 @@ import os
 import pytest
 
 from backends.factory import build_backend, build_client
-from harness.config import load_config
+from harness.config import load_config, load_dotenv
 from harness.graders import grade
 from harness.prompts import load_prompts
 from tests.conftest import ROOT
@@ -23,22 +23,27 @@ from tests.conftest import ROOT
 pytestmark = pytest.mark.integration
 
 
-def _reachable(base_url: str) -> bool:
+def _reachable(env) -> bool:
     import requests
 
+    # Provider-correct liveness probe. OpenAI-compatible servers (LM Studio,
+    # vLLM) expose /models; Ollama has NO /models and exposes /api/tags instead.
+    # The old /models-only probe 404'd on a *live* Ollama, silently skipping
+    # these tests against it.
+    path = "/api/tags" if env.provider == "ollama" else "/models"
     try:
-        # /models works for both openai (/v1/models) and is harmless elsewhere
-        return requests.get(f"{base_url.rstrip('/')}/models", timeout=3).status_code == 200
+        return requests.get(f"{env.base_url.rstrip('/')}{path}", timeout=3).status_code == 200
     except Exception:
         return False
 
 
 @pytest.fixture(scope="module")
 def live_env():
+    load_dotenv()  # honor the documented .env (LLM_PROVIDER/LLM_BASE_URL/LLM_MODEL)
     config = load_config(ROOT / "config" / "config.yaml")
     env = config.env(os.environ.get("LLM_ENV", "local")).resolved()
-    if not _reachable(env.base_url):
-        pytest.skip(f"no model server reachable at {env.base_url}")
+    if not _reachable(env):
+        pytest.skip(f"no {env.provider} server reachable at {env.base_url}")
     return config, env
 
 
