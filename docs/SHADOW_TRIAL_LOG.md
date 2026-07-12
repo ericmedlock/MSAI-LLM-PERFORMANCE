@@ -82,23 +82,47 @@ Surfaced while investigating "does this seem slow for an A4500?"
 - **Takeaway.** The resumable/idempotent design is validated for long unattended runs — important
   for the multi-hour HPC sweep where requeues are expected.
 
-## 5. A/B — RTX A4500 vs Apple M5 Max (throughput)
+## 5. Shadow A4500 vs Apple M5 Max — matched comparison
 
-Apples-to-apples on the **same frontier tier** and same 14 B model, from committed data:
+**Scope caveat (important).** The prior M5 Max frontier-v2 data (`results/frontier-v2-calib-14b.jsonl`,
+env=local, LM Studio) is a difficulty **calibration** run: **monolithic only** (62 tasks × N=1–5,
+0 agentic / 0 swarm rows). So the *only* apples-to-apples comparison is **monolithic**. The Shadow
+trial is therefore the **first full 3-architecture (monolithic + agentic + swarm) frontier-v2 run on
+any machine**; agentic/swarm have no M5 Max counterpart on this tier.
 
-| Machine (server) | Suite | Mean tokens/s |
-|---|---|---|
-| **Shadow RTX A4500** (Ollama/CUDA) | frontier-v2 (clean) | **~43.5** |
-| Apple M5 Max (LM Studio/Metal) | frontier calibration | **41.1** |
-| Apple M5 Max | baseline suite | 50.8 |
+### 5a. Accuracy — monolithic, same 36 frontier-v2 tasks, N=1
 
-**Conclusion:** on identical frontier workload the A4500 (~43.5 tok/s) is **essentially equal to
-the M5 Max (~41 tok/s)** — a hair faster; the M5 led only on the easier baseline suite. Both are
-memory-bandwidth-bound on the ~9 GB model (A4500 640 GB/s GDDR6; M5 Max ~400–550 GB/s unified), so
-they land in the same ~40–50 tok/s band. The earlier "slowness" was the §3 contention bug.
+| domain | Shadow A4500 (Ollama/CUDA) | M5 Max (LM Studio/Metal) |
+|--------|:--------------------------:|:------------------------:|
+| math   | 3/12 | 5/12 |
+| code   | 5/12 | 6/12 |
+| hop    | 8/12 | 8/12 |
+| **TOTAL** | **16/36 (44%)** | **19/36 (53%)** |
 
-*(Final-run aggregate tok/s across all 108 was 37.7 — lower than the clean 43.5 because it folds in
-the long agentic/swarm reasoning cells; per-call decode rate is unchanged.)*
+Per-cell agreement across the 36 monolithic cells: **69% (25/36)** identical verdict; disagreements
+roughly balanced (M5 correct where Shadow wrong on 7; Shadow correct where M5 wrong on 4).
+
+**Read:** 16 vs 19 is a 3-item swing on 36 at N=1 — **within noise**, and not purely hardware. The two
+environments serve the *nominally* identical model through **different servers** (Ollama vs LM Studio),
+which can differ in GGUF build, tokenizer, and temperature-0 tie-breaking. This is the documented
+Metal-vs-CUDA cross-environment threat (pre-reg §S12), not a capability gap.
+
+### 5b. Throughput — monolithic
+
+| | Shadow A4500 (Ollama/CUDA) | M5 Max (LM Studio/Metal) |
+|---|:---:|:---:|
+| mean tokens/s | **36.9** | **40.4** |
+| mean latency  | **73 s** | 78 s |
+| n (rows)      | 36 | 310 |
+
+**Conclusion:** effectively equal (~7% apart), latencies within ~7%. Both are memory-bandwidth-bound on
+the ~9 GB model (A4500 640 GB/s GDDR6; M5 Max ~400–550 GB/s unified). The A4500 is **not slow** — the
+earlier apparent slowness was the §3 contention bug. (For reference, the M5 Max baseline suite ran
+~50.8 tok/s; the easier tasks emit shorter outputs. Shadow's all-108 aggregate was 37.7 tok/s, dragged
+down by the long agentic/swarm reasoning cells — per-call decode rate is unchanged.)
+
+*Supersedes an earlier rougher "~43.5 vs ~41 tok/s" estimate; this matched-manifest monolithic
+comparison (36.9 vs 40.4) is the correct figure.*
 
 ## 6. Finding — agentic "empty answer" / `format_error` (mono-vs-agentic bias investigation)
 
