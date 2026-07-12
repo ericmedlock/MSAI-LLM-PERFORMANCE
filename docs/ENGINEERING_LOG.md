@@ -148,6 +148,7 @@ the model swap and the machine-portability work (self-bootstrapping `setup.sh`).
 | B3 | CLI tests not hermetic | `main()` reads `./.env`; a dev `.env` changed the asserted banner | autouse fixture neutralizes ambient `.env` | offline suite green with a dev `.env` present |
 | B4 | Tests + dev runs rewrite **frozen** provenance | host sidecar written to fixed `config.results_dir` regardless of `--output` → `results/host/*.json` + `hosts.csv` clobbered on every runner test | co-locate the sidecar with the **output path** | regression test; frozen provenance stays clean after a full test run |
 | B5 | **Ollama real-model validation silently skipped** | integration liveness probe used `/models` (OpenAI-only); Ollama returns 404 there (it uses `/api/tags`) → `_reachable` false → tests skipped on a *live* Ollama | provider-aware probe (`/api/tags` for ollama) + load `.env` in the fixture | 2 integration tests now **pass** vs Ollama; offline regression guard added |
+| B6 | Long reasoning turns time out on slow hardware | client read timeout hardcoded at 600 s; a full `max_tokens=6144` turn at the M4's ~9.65 tok/s needs ~640 s → `backend_exception` timeout mid-trial | `LLM_TIMEOUT_S` env override (default 600; a per-machine hardware knob, **not** a pinned science param) | unit test asserts the override reaches the client; M4 trial re-ran clean at 1800 s |
 
 ### 4.1 Data-integrity incident (recorded, not trusted)
 

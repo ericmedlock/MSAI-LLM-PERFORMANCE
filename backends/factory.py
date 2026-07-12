@@ -5,6 +5,8 @@ Centralizes the wiring so the runner and tests build backends the same way.
 
 from __future__ import annotations
 
+import os
+
 from backends.agentic import AgenticBackend
 from backends.base import Backend
 from backends.llm_client import LLMClient
@@ -39,7 +41,14 @@ def _make_client(
     provider: str, base_url: str, model: str, decoding, api_key: str
 ) -> LLMClient:
     """Construct a provider client. Concrete HTTP clients are imported lazily
-    so offline tests never require them."""
+    so offline tests never require them.
+
+    ``LLM_TIMEOUT_S`` overrides the per-request read timeout (default 600 s). It
+    is a machine/hardware concern, NOT a pinned scientific parameter: slow boxes
+    (e.g. a 14B reasoning model on Apple Metal at ~10 tok/s) can need >600 s to
+    emit a full ``max_tokens`` generation, so a fixed 600 s silently turns long
+    reasoning turns into ``backend_exception`` timeouts."""
+    timeout_s = float(os.environ.get("LLM_TIMEOUT_S", "600"))
     if provider == "ollama":
         from backends.llm_client import OllamaClient
 
@@ -50,6 +59,7 @@ def _make_client(
             num_ctx=decoding.num_ctx,
             max_tokens=decoding.max_tokens,
             seed=decoding.seed,
+            timeout_s=timeout_s,
         )
     if provider in ("openai", "openai-compatible", "lmstudio"):
         from backends.llm_client import OpenAICompatibleClient
@@ -62,6 +72,7 @@ def _make_client(
             max_tokens=decoding.max_tokens,
             seed=decoding.seed,
             api_key=api_key,
+            timeout_s=timeout_s,
         )
     raise ValueError(f"unknown provider {provider!r}")
 
