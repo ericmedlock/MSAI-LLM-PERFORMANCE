@@ -1,0 +1,201 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{amssymb}
+\usepackage{parskip}
+\emergencystretch=3em
+\sloppy
+
+\definecolor{cmdbg}{gray}{0.93}
+\newcommand{\cmd}[1]{\colorbox{cmdbg}{\texttt{#1}}}
+\newcommand{\field}[1]{\texttt{#1}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Prompt Provenance Guide}
+\fancyhead[R]{\small MSAI-LLM-PERFORMANCE}
+\fancyfoot[C]{\small Page \thepage}
+
+\title{Reconstructing the Exact LLM Inputs\\
+\large How to read the benchmark questions from the repository's code and metadata\\
+\normalsize Repository: \texttt{github.com/ericmedlock/MSAI-LLM-PERFORMANCE} \quad Guide version: 2026-07-11}
+\author{ITCS 6881 --- LLM Execution Architecture Benchmark}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\section*{The one-paragraph answer}
+
+Every question the model ever sees is stored in plain text in the repository, in
+three composable layers: (1) the \textbf{task manifests} under \texttt{tasks/}
+hold each question's exact user-message text in the \field{prompt} field; (2) the
+\textbf{frozen system prompts} under \texttt{prompts/} hold the per-role
+instructions that precede it; (3) \texttt{config/config.yaml} pins the decoding
+parameters (temperature, seed, context, output budget). On top of that, every
+recorded run in \texttt{results/*.jsonl} carries a \field{raw\_trace} of the
+messages \emph{actually sent}, so any historical run can be audited without
+reconstruction. Nothing is generated at run time; reproduction is a matter of
+reading files, not re-running code.
+
+\section{Layer 1 --- the task manifests (\texttt{tasks/})}
+
+\begin{tabular}{p{2.1in}p{3.9in}}
+\textbf{File} & \textbf{Contents}\\
+\hline\\[-8pt]
+\texttt{manifest.json} & the frozen 15-item \emph{baseline} suite (5 GSM8K / 5 HumanEval / 5 HotpotQA)\\
+\texttt{frontier\_v2\_manifest.json} & the frozen 36-item \emph{frontier} tier (12 AIME 2025 / 12 BigCodeBench-Hard / 12 MuSiQue open-book)\\
+\texttt{frontier\_manifest.json}, \texttt{frontier\_external\_manifest.json} & superseded candidate generations, kept for provenance\\
+\end{tabular}
+
+Each entry in a manifest's \field{tasks} array has these fields:
+
+\begin{itemize}
+  \item \field{task\_id} --- the stable key every result row references (e.g.\ \texttt{fx2-mathA-001}).
+  \item \field{prompt} --- \textbf{the complete user-message text, verbatim.} What
+    you read here is byte-for-byte what the model receives as the user turn ---
+    including the answer-format instruction line, and (for multihop items) the
+    embedded context passages, and (for code items) the function signature and
+    docstring to complete.
+  \item \field{answer} --- the gold answer for exact/normalized matching
+    (\texttt{null} for code items, which grade by unit test instead).
+  \item \field{grading} --- for code items: \field{entry\_point} (the function
+    name) and \field{test} (the full test source; the grader executes
+    \emph{model code} + \emph{test} + \texttt{check(entry\_point)} in a
+    subprocess).
+  \item \field{source\_id} --- upstream identity, e.g.\
+    \texttt{aime25:0}, \texttt{bigcodebench-hard-v0.1.4:BigCodeBench/16},
+    \texttt{musique:2hop\_\_123\ldots\ (with context)}, \texttt{gsm8k/main train[0]}.
+  \item \field{id\_status} --- provenance verdict
+    (\texttt{FROZEN\_CALIBRATED\_IN\_BAND}, \texttt{VERIFIED\_UPSTREAM\_EXACT} /
+    \texttt{\_ADAPTED}, \texttt{PROJECT\_AUTHORED}) --- see
+    \texttt{scripts/verify\_task\_ids.py} and the Amendment Log.
+  \item \field{selection\_reason} --- why the item is in the suite (human-readable
+    audit trail, including calibration history).
+  \item \field{reference\_solution} --- (code items) the upstream canonical
+    solution, used only to self-verify the test at build time; never shown to the model.
+\end{itemize}
+
+\section{Layer 2 --- the frozen system prompts (\texttt{prompts/})}
+
+Each architecture role has its own version-controlled system prompt:
+
+\begin{tabular}{p{3.15in}p{2.85in}}
+\texttt{prompts/monolithic/system.txt} & the single-shot solver\\
+\texttt{prompts/agentic/executor\_system.txt} & the agentic executor\\
+\texttt{prompts/agentic/verifier\_system.txt} & the agentic verifier\\
+\texttt{prompts/swarm/peer\_system.txt} & every swarm peer (identical for all three)\\
+\texttt{prompts/judge/system.txt} & the LLM-as-judge (post-processing only)\\
+\end{tabular}
+
+These files are frozen; \texttt{prompts/README.md} documents the intentional
+role differences.
+
+\section{Layer 3 --- message composition per architecture}
+
+The harness composes exactly two-role conversations (one system + one user
+message per call). From the backend sources (\texttt{backends/*.py}):
+
+\textbf{Monolithic} --- one call:
+\begin{quote}\ttfamily\small
+system = prompts/monolithic/system.txt\\
+user \ \ = manifest prompt (verbatim)
+\end{quote}
+
+\textbf{Agentic} (Executor + Verifier, max 2 loops) --- first executor call uses the
+manifest prompt verbatim; the verifier then receives:
+\begin{quote}\ttfamily\small
+Task:\{question\}\textbackslash n\textbackslash nCandidate answer:\textbackslash n\{candidate\}
+\end{quote}
+If the verifier does not reply starting with \texttt{APPROVE}, the executor is
+re-invoked with the templated revision message:
+\begin{quote}\ttfamily\small
+Your previous answer was:\textbackslash n\{candidate\}\textbackslash n\textbackslash nVerifier feedback: \{feedback\}\textbackslash nProvide a corrected final answer.
+\end{quote}
+
+\textbf{Swarm} --- three parallel peers, each: peer system prompt + manifest prompt
+verbatim; the only difference between peers is the sampling seed
+(\texttt{seed = base\_seed + peer\_index}); answers are majority-voted.
+
+\textbf{Judge} (secondary metric) --- composed by \texttt{harness/judge.py} from the
+judge system prompt + the task, gold answer, and the recorded model answer.
+
+\textbf{Decoding pins (all calls):} temperature 0.0, seed 42 (+peer offset),
+\texttt{num\_ctx} 8192, \texttt{max\_tokens} 6144 --- from
+\texttt{config/config.yaml}, whose raw bytes are hashed into every row's
+\field{config\_hash}.
+
+\section{Recipes}
+
+\textbf{Print one task's exact user message} (repo root, any machine):
+\begin{quote}\ttfamily\small
+./.venv/bin/python -c "import json; \\
+\hspace*{1em}m=json.load(open('tasks/frontier\_v2\_manifest.json')); \\
+\hspace*{1em}print([t for t in m['tasks'] if t['task\_id']=='fx2-mathA-001'][0]['prompt'])"
+\end{quote}
+
+\textbf{Dump every question to a file} (e.g.\ for a report appendix):
+\begin{quote}\ttfamily\small
+./.venv/bin/python -c "import json; \\
+\hspace*{1em}m=json.load(open('tasks/frontier\_v2\_manifest.json')); \\
+\hspace*{1em}print('\textbackslash n\textbackslash n'.join(f\textquotesingle=== \{t[\textquotesingle task\_id\textquotesingle]\} (\{t[\textquotesingle source\_id\textquotesingle]\}) ===\textbackslash n\{t[\textquotesingle prompt\textquotesingle]\}\textquotesingle\ for t in m['tasks']))" \\
+\hspace*{1em}> all\_frontier\_questions.txt
+\end{quote}
+
+\textbf{Audit what a historical run actually sent} --- join a result row back to its
+inputs via \field{task\_id}, or read the row's own \field{raw\_trace}, which
+records each agent call's user message and output:
+\begin{quote}\ttfamily\small
+./.venv/bin/python -c "import json; \\
+\hspace*{1em}r=[json.loads(l) for l in open('results/frontier-v2-local-ollama-14b.jsonl')]; \\
+\hspace*{1em}row=[x for x in r if x['task\_id']=='fx2-mathA-001' and x['backend']=='agentic'][0]; \\
+\hspace*{1em}print(json.dumps(row['raw\_trace'], indent=2))"
+\end{quote}
+
+\textbf{Byte-exact historical reproduction:} every row carries
+\field{config\_hash}; check out the commit where \texttt{config/config.yaml}
+hashes to that value (v1 freeze: tag \texttt{data-freeze-2026-07-01}) and the
+three layers above are guaranteed identical to what ran.
+
+\section{Worked example --- \texttt{fx2-mathA-001}}
+
+Manifest fields (from \texttt{tasks/frontier\_v2\_manifest.json}):
+
+\begin{quote}\ttfamily\small
+task\_id:\ \ fx2-mathA-001\\
+domain:\ \ \ math \quad tier: frontier\\
+source\_id: aime25:0 \quad (AIME 2025, problem index 0 in math-ai/aime25)\\
+id\_status: FROZEN\_CALIBRATED\_IN\_BAND\\
+answer:\ \ \ 70
+\end{quote}
+
+The \field{prompt} field --- and therefore the exact user message, shown here
+verbatim including its LaTeX-style math notation, which is passed through as
+plain text:
+
+\begin{quote}\ttfamily\small
+Find the sum of all integer bases \$b>9\$ for which \$17\_b\$ is a divisor of \$97\_b.\$\\[4pt]
+Give the final answer as a single integer on the last line.
+\end{quote}
+
+For a \emph{monolithic} run, the model receives
+\texttt{prompts/monolithic/system.txt} as the system message and the text above
+as the user message, decoded at temperature 0.0, seed 42, output cap 6144 ---
+nothing else. For \emph{swarm}, three peers receive the identical pair with seeds
+42/43/44. For \emph{agentic}, the executor starts from the same pair and the
+verifier/revision templates of \S3 take over from there --- with the exact
+realized sequence stored in the run row's \field{raw\_trace}.
+
+\section*{Upstream provenance chain}
+
+\texttt{source\_id} $\rightarrow$ fetch/verify tooling: baseline items are
+verified against their public sources by \texttt{scripts/verify\_task\_ids.py};
+frontier items were built (and self-graded through the real grader) by
+\texttt{scripts/build\_frontier\_v2.py} from HuggingFace datasets
+(\texttt{math-ai/aime25}, \texttt{bigcode/bigcodebench-hard},
+\texttt{dgslibisey/MuSiQue}). The full re-sourcing history and every deviation is
+in \texttt{PRE\_REGISTRATION.md}'s Amendment Log.
+
+\end{document}
