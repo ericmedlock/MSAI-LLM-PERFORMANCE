@@ -38,9 +38,14 @@ fi
 have ollama || { echo "[bootstrap] ollama still not on PATH — open a fresh shell and re-run"; exit 1; }
 
 # --- 2. make sure the server is up -----------------------------------------------
+# Server flags (A/B-tested 2026-07-11, outputs byte-identical to pure defaults):
+#   KEEP_ALIVE=-1     never unload the model mid-session (prevents reload stalls)
+#   NUM_PARALLEL=1    runs are strictly sequential; parallel slots just partition KV
+# OLLAMA_FLASH_ATTENTION was tested and REJECTED: -3.8% aggregate on Metal
+# (-5..8% on long generations); see vault Engineering Log E11.
 if ! curl -sf "$BASE/api/tags" >/dev/null; then
   echo "[bootstrap] starting ollama serve"
-  (OLLAMA_HOST="${BASE#http://}" ollama serve >/dev/null 2>&1 &)
+  (OLLAMA_HOST="${BASE#http://}" OLLAMA_KEEP_ALIVE=-1 OLLAMA_NUM_PARALLEL=1 ollama serve >/dev/null 2>&1 &)
   for i in $(seq 1 30); do curl -sf "$BASE/api/tags" >/dev/null && break; sleep 2; done
 fi
 curl -sf "$BASE/api/tags" >/dev/null || { echo "[bootstrap] ollama server did not come up"; exit 1; }
