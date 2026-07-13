@@ -204,9 +204,36 @@ Two distinct layers, not to be conflated:
 
 ---
 
-## 7. This machine's trial (in progress)
+## 7. M4 Mini (Apple Metal) monolithic cell — completed
 
-**M4 Mini (Metal, 24 GB), Ollama, deepseek-r1:14b, frozen frontier-v2, N=1** — adds
-the Apple-Metal hardware point to the cross-machine comparison (vs Shadow/CUDA). Output
-isolated under `results/m4-ollama/` so provenance does not collide with the frozen
-`local` cell. Results and per-domain breakdown to be appended here on completion.
+**M4 Mini (Metal, 24 GB), Ollama, deepseek-r1:14b, frozen frontier-v2, monolithic, N=1.**
+Scoped to monolithic-only — the full 3-backend run was ~13–16 h on this box (see
+latency below), and the M4 cell's value is (a) a cross-hardware **reproducibility
+check** and (b) an **Apple-Metal-vs-CUDA latency** point, both of which a single-pass
+cell delivers. Output isolated under `results/m4-ollama/`.
+
+### Accuracy — identical 36 frozen items, temp 0 (reproducibility check)
+| domain | M4 (Metal) | Shadow (CUDA) |
+|---|---|---|
+| math (AIME 2025) | 6/12 = 50% | 3/12 = 25% |
+| code (BigCodeBench-Hard) | 4/12 = 33% | 5/12 = 42% |
+| multihop (MuSiQue+context) | 8/12 = 67% | 8/12 = 67% |
+| **overall** | **18/36 = 50%** | **16/36 = 44%** |
+
+Aggregate accuracy is close (50% vs 44%, both near the N=5 calibration of 52%) and
+**multihop is identical**. The math/code per-domain swings are **N=1 sampling noise**:
+temp 0 does *not* force identical single outputs across Metal and CUDA — a small early
+divergence in the reasoning chain flips the final answer — but the distributions line
+up. **Takeaway:** for this reasoning model, cross-accelerator results reproduce *in
+aggregate*, not *per-item*; per-item cross-hardware comparisons need N > 1.
+
+### Latency — the Apple-Metal cost
+| host | median / call | throughput | wall (36 monolithic) |
+|---|---|---|---|
+| M4 Mini (Metal, 24 GB) | 322 s | ~10.4 tok/s | 3.1 h |
+| Shadow (RTX A4500, CUDA) | 71 s | ~39 tok/s | 0.7 h |
+
+The M4 is **~4.6× slower per call (~3.8× fewer tok/s)** on this 14B reasoning workload —
+why the full 3-backend run projected to ~13–16 h and was scoped to monolithic. This is
+also what surfaced **B6**: at ~10 tok/s a full 6144-token turn exceeds the old 600 s
+client timeout.
