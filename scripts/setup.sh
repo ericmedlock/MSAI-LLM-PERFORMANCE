@@ -84,8 +84,12 @@ VPY=".venv/bin/python"; [ -x "$VPY" ] || VPY=".venv/Scripts/python.exe"
 # CUDA hosts (shadow/hpc/Azure) need the NVML binding for GPU telemetry
 # (pynvml, via nvidia-ml-py). It is split out because it does not exist on
 # Metal. Without it, peak_vram_mb / gpu_util / gpu_power are silently null.
-if command -v nvidia-smi >/dev/null 2>&1; then
-  echo "[setup] NVIDIA GPU detected — installing CUDA telemetry deps"
+# NOTE: on HPC the venv is built on a GPU-less LOGIN node (no nvidia-smi), but
+# the jobs run on GPU compute nodes — so gate on the detected PROFILE, not on
+# nvidia-smi being present at build time, or the whole HPC sweep records null
+# GPU telemetry. pip install needs no GPU; only import-time (on the node) does.
+if [ "$PROFILE" = "hpc" ] || command -v nvidia-smi >/dev/null 2>&1; then
+  echo "[setup] CUDA profile ($PROFILE) — installing GPU telemetry deps (nvidia-ml-py)"
   "$VPY" -m pip install -q -r requirements-cuda.txt
 fi
 echo "[setup] python deps installed"
