@@ -4,9 +4,20 @@
 # Ollama model server, and pulls the pinned model. Idempotent — run it as
 # often as you like. After it succeeds: bash scripts/run_trials.sh
 #
-# Usage: bash scripts/setup.sh [model_tag]      (default deepseek-r1:14b)
+# Usage: bash scripts/setup.sh [--download|--offline] [model_tag]
+#   (no flag)   full setup — laptop/Shadow behavior, unchanged (default deepseek-r1:14b)
+#   --download  same full setup; run on a CLUSTER LOGIN NODE (has internet) so all
+#               artifacts (venv, ollama binary, model blobs) land on the shared FS
+#   --offline   verify-only for CLUSTER COMPUTE NODES (no internet assumed):
+#               checks venv + ollama binary + model cache, fails fast with a remedy
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+STAGE=full
+case "${1:-}" in
+  --download) STAGE=download; shift ;;
+  --offline)  STAGE=offline;  shift ;;
+esac
 MODEL="${1:-deepseek-r1:14b}"
 
 # --- 0. detect where we are --------------------------------------------------------
@@ -21,6 +32,41 @@ detect_profile() {
 }
 PROFILE="$(detect_profile)"
 echo "[setup] detected profile: $PROFILE  ($(uname -s), GPU: $(command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi --query-gpu=name --format=csv,noheader | head -1 || echo 'none/Metal'))"
+
+# On a cluster, keep the model cache on scratch, not the quota'd home dir.
+# Must match between --download (login node) and jobs; run_trials.sh applies
+# the same default so both sides agree without any per-user config.
+if [ "$PROFILE" = "hpc" ] && [ -z "${OLLAMA_MODELS:-}" ] && [ -d "/scratch/$USER" ]; then
+  export OLLAMA_MODELS="/scratch/$USER/ollama-models"
+  echo "[setup] OLLAMA_MODELS defaulted to $OLLAMA_MODELS (home dir is quota'd)"
+fi
+
+# --- offline stage: verify artifacts only; no network, no installs ------------------
+if [ "$STAGE" = "offline" ]; then
+  FAIL=0
+  if [ -x ".venv/bin/python" ] || [ -x ".venv/Scripts/python.exe" ]; then
+    echo "[setup:offline] venv: OK"
+  else
+    echo "[setup:offline] venv: MISSING — run 'bash scripts/setup.sh --download' on a login node"; FAIL=1
+  fi
+  export PATH="$HOME/.local/bin:$PATH"
+  if command -v ollama >/dev/null 2>&1; then
+    echo "[setup:offline] ollama binary: OK ($(command -v ollama))"
+  else
+    echo "[setup:offline] ollama binary: MISSING — run 'bash scripts/setup.sh --download' on a login node"; FAIL=1
+  fi
+  # model blobs live under <cache>/manifests/registry.ollama.ai/library/<name>/<tag>
+  CACHE="${OLLAMA_MODELS:-$HOME/.ollama/models}"
+  NAME="${MODEL%%:*}"; TAG="${MODEL#*:}"; [ "$TAG" = "$MODEL" ] && TAG=latest
+  if [ -f "$CACHE/manifests/registry.ollama.ai/library/$NAME/$TAG" ]; then
+    echo "[setup:offline] model cache ($MODEL): OK"
+  else
+    echo "[setup:offline] model cache ($MODEL): MISSING under $CACHE"
+    echo "[setup:offline]   remedy: on a login node: OLLAMA_MODELS=$CACHE bash scripts/setup.sh --download $MODEL"; FAIL=1
+  fi
+  [ "$FAIL" = 0 ] && echo "[setup:offline] all artifacts present — ready to run" || exit 1
+  exit 0
+fi
 
 # --- 1. python venv + deps ----------------------------------------------------------
 PY=""

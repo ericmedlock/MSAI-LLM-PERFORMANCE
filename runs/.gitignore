@@ -1,0 +1,3 @@
+# SLURM stdout/stderr lands here (see scripts/job_frontier_a40.sbatch).
+# The directory must exist at submit time; the logs themselves stay local.
+slurm-*.out
