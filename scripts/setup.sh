@@ -81,6 +81,13 @@ fi
 VPY=".venv/bin/python"; [ -x "$VPY" ] || VPY=".venv/Scripts/python.exe"
 "$VPY" -m pip install -q --upgrade pip
 "$VPY" -m pip install -q -r requirements.txt
+# CUDA hosts (shadow/hpc/Azure) need the NVML binding for GPU telemetry
+# (pynvml, via nvidia-ml-py). It is split out because it does not exist on
+# Metal. Without it, peak_vram_mb / gpu_util / gpu_power are silently null.
+if command -v nvidia-smi >/dev/null 2>&1; then
+  echo "[setup] NVIDIA GPU detected — installing CUDA telemetry deps"
+  "$VPY" -m pip install -q -r requirements-cuda.txt
+fi
 echo "[setup] python deps installed"
 
 # --- 2. offline test suite (no model, no GPU, no network) ---------------------------

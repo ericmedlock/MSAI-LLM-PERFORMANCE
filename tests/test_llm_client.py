@@ -66,3 +66,28 @@ def test_ollama_client_builds_request_and_parses_counts(monkeypatch):
     assert captured["json"]["options"]["seed"] == 42
     assert captured["json"]["options"]["num_ctx"] == 8192
     assert resp.tokens_in == 30 and resp.tokens_out == 120
+
+
+def test_integration_reachability_probe_is_provider_correct(monkeypatch):
+    # Regression: the live-server probe must hit Ollama's /api/tags (Ollama has
+    # NO /models). A /models-only probe 404'd on a *live* Ollama and silently
+    # skipped the integration tests against it. Guarded here in the OFFLINE
+    # suite because the integration tests themselves skip when no server is up.
+    from tests.test_integration_lmstudio import _reachable
+
+    calls = []
+
+    def fake_get(url, timeout=None):
+        calls.append(url)
+        return SimpleNamespace(status_code=200)
+
+    monkeypatch.setattr(llm.requests, "get", fake_get)
+    assert _reachable(SimpleNamespace(provider="ollama", base_url="http://h:11434"))
+    assert _reachable(SimpleNamespace(provider="openai", base_url="http://h:1234/v1"))
+    assert calls == ["http://h:11434/api/tags", "http://h:1234/v1/models"]
+
+    def boom(url, timeout=None):
+        raise ConnectionError("server down")
+
+    monkeypatch.setattr(llm.requests, "get", boom)
+    assert _reachable(SimpleNamespace(provider="ollama", base_url="http://h:11434")) is False

@@ -60,6 +60,17 @@ def test_build_client_honors_dotenv_override(config, monkeypatch):
     assert client.model_tag == "qwen2.5:14b"
 
 
+def test_build_client_timeout_override(config, monkeypatch):
+    # Read timeout defaults to 600s but is overridable per-machine: slow boxes
+    # (14B reasoning model at ~10 tok/s) need >600s for a full max_tokens turn,
+    # else long turns silently become backend_exception timeouts.
+    for var in ("LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_S"):
+        monkeypatch.delenv(var, raising=False)
+    assert build_client(config, "local").timeout_s == 600.0
+    monkeypatch.setenv("LLM_TIMEOUT_S", "1800")
+    assert build_client(config, "local").timeout_s == 1800.0
+
+
 def test_swarm_same_seed_strategy_disables_offset(prompts):
     from backends.base import Task
 

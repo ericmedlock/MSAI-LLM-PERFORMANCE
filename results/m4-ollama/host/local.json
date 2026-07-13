@@ -1,0 +1,30 @@
+{
+  "host_id": "d2c461a39996",
+  "hostname": "Erics-M4-mini",
+  "environment": "local",
+  "runtime": "metal",
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "python": "3.13.11",
+  "hardware": {
+    "chip": "Apple M4",
+    "machine_model": "Mac16,10",
+    "cpu_cores": 10,
+    "total_ram_gb": 24,
+    "gpu_model": "Apple M4",
+    "gpu_cores": "10",
+    "total_vram_gb": 24,
+    "unified_memory": true
+  },
+  "serving": {
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "backend_model": "deepseek-r1:14b",
+    "judge_model": "llama-3.2-3b-instruct",
+    "models_available": [
+      "deepseek-r1:14b",
+      "llama3.2:3b"
+    ]
+  },
+  "config_hash": "e33a15cdfd8a0c35",
+  "captured_at": "2026-07-13T14:19:32.444019+00:00"
+}
