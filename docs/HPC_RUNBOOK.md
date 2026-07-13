@@ -25,8 +25,10 @@ further Shadow runs are planned. What remains is HPC compute.
 
 ```bash
 # LOGIN NODE (has internet) — one-time per cluster: venv + deps + offline tests +
-# no-root Ollama + model pull to scratch. Pin the server build for reproducibility:
-OLLAMA_VERSION=v0.9.6 bash scripts/setup.sh --download    # pick the pinned release
+# no-root Ollama + model pull to scratch. The Ollama build is pinned by default to
+# v0.24.0 (same version as the M5 Max local cell) and checksum-verified against the
+# release's sha256sum.txt; override only deliberately via OLLAMA_VERSION=...
+bash scripts/setup.sh --download
 
 # submit the confirmatory sweep: 3 array elements (monolithic/agentic/swarm),
 # one A40 each, own Ollama server on a private port, own output file

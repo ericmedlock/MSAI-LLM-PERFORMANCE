@@ -8,8 +8,9 @@ set -euo pipefail
 MODEL="${1:-deepseek-r1:14b}"
 BASE="${OLLAMA_BASE:-http://localhost:11434}"
 USERBIN="$HOME/.local/bin"
-# OLLAMA_VERSION (optional): pin the Linux no-root install to an exact release
-# (reproducibility on clusters). Unset = ollama.com latest (laptop/Shadow behavior).
+# OLLAMA_VERSION (optional): exact release for the Linux no-root install.
+# Defaults to v0.24.0 — the version serving the pinned local (M5 Max) cell —
+# so every environment runs the same server build unless deliberately overridden.
 # OLLAMA_MODELS (optional): model cache dir; on HPC point at scratch, not $HOME.
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -32,15 +33,21 @@ if ! have ollama; then
       fi
       ;;
     Linux)
-      # No-root install (HPC-friendly): standalone tarball into ~/.local
+      # No-root install (HPC-friendly) from the official GitHub release.
+      # (ollama.com/download/ollama-linux-amd64.tgz is gone — 404 as of
+      # 2026-07-13; releases now ship .tar.zst with a sha256sum.txt.)
+      OLLAMA_VERSION="${OLLAMA_VERSION:-v0.24.0}"
+      have zstd || { echo "[bootstrap] FATAL: zstd not found (tar needs it). Try: module load zstd"; exit 1; }
+      REL="https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}"
+      TMPD="$(mktemp -d)"
+      echo "[bootstrap] downloading ollama ${OLLAMA_VERSION} (pinned, no root needed)"
+      curl -fsSL -o "$TMPD/ollama-linux-amd64.tar.zst" "$REL/ollama-linux-amd64.tar.zst"
+      curl -fsSL -o "$TMPD/sha256sum.txt" "$REL/sha256sum.txt"
+      (cd "$TMPD" && grep ' \./ollama-linux-amd64\.tar\.zst$' sha256sum.txt | sha256sum -c -) \
+        || { echo "[bootstrap] FATAL: checksum mismatch on ollama tarball"; exit 1; }
       mkdir -p "$USERBIN"
-      if [ -n "${OLLAMA_VERSION:-}" ]; then
-        echo "[bootstrap] downloading standalone ollama ${OLLAMA_VERSION} (pinned, no root needed)"
-        curl -fsSL "https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/ollama-linux-amd64.tgz" | tar -xz -C "$HOME/.local"
-      else
-        echo "[bootstrap] downloading standalone ollama (latest, no root needed)"
-        curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz | tar -xz -C "$HOME/.local"
-      fi
+      tar --zstd -xf "$TMPD/ollama-linux-amd64.tar.zst" -C "$HOME/.local"
+      rm -rf "$TMPD"
       export PATH="$USERBIN:$PATH"
       ;;
     Darwin)
