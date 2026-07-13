@@ -12,7 +12,15 @@ Composition (mechanical, first-N validating, no outcome peeking):
 Both grade via the normalized-string 'probe' domain (graders.py). Calibrate
 mono N=5 on the production stack (same band rule) before any swarm variant run.
 
-Usage: python scripts/build_swarm_probe.py   (needs the HF datasets-server up)
+Usage: python scripts/build_swarm_probe.py
+
+Data source ladder (tried in order):
+1. HF datasets-server rows API (primary)
+2. HF hub direct parquet via /resolve/ (separate service; survives rows-API outages)
+3. Manual fallbacks if the whole hub is down (documented, not automated):
+   DROP — AllenAI S3: https://ai2-public-datasets.s3.amazonaws.com/drop/drop_dataset.zip
+   MMLU-Pro — upstream repo: https://github.com/TIGER-AI-Lab/MMLU-Pro
+pyarrow is a builder-only dependency (deliberately not in requirements.txt).
 """
 import json
 import sys
@@ -26,8 +34,36 @@ from harness.graders import grade
 
 DS = "https://datasets-server.huggingface.co/rows"
 
+# Hub-parquet fallback (the rows API and the hub are separate services; during
+# the 2026-07-13 rows-API outage the hub stayed up). Needs pyarrow — a
+# builder-only dependency, deliberately NOT in requirements.txt.
+PARQUET = {
+    ("TIGER-Lab/MMLU-Pro", "test"):
+        "https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro/resolve/main/data/test-00000-of-00001.parquet",
+    ("ucinlp/drop", "validation"):
+        "https://huggingface.co/datasets/ucinlp/drop/resolve/main/data/validation-00000-of-00001.parquet",
+}
+_parquet_cache: dict = {}
 
-def fetch(ds, cfg, split, offset, length=100, attempts=5):
+
+def _rows_via_parquet(ds, split):
+    key = (ds, split)
+    if key not in _parquet_cache:
+        import pathlib
+        import pyarrow.parquet as pq
+        url = PARQUET[key]
+        dest = pathlib.Path(".cache/probe") / url.rsplit("/", 1)[-1]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not dest.exists():
+            print(f"  [parquet] downloading {url}")
+            req = urllib.request.Request(url, headers={"User-Agent": "swarm-probe-builder"})
+            with urllib.request.urlopen(req, timeout=300) as r, open(dest, "wb") as f:
+                f.write(r.read())
+        _parquet_cache[key] = pq.read_table(dest).to_pylist()
+    return _parquet_cache[key]
+
+
+def fetch(ds, cfg, split, offset, length=100, attempts=2):
     q = urllib.parse.urlencode({"dataset": ds, "config": cfg, "split": split,
                                 "offset": offset, "length": length})
     for i in range(attempts):
@@ -36,10 +72,9 @@ def fetch(ds, cfg, split, offset, length=100, attempts=5):
                 return [x["row"] for x in json.load(r)["rows"]]
         except Exception as exc:
             if i == attempts - 1:
-                raise
-            wait = 2 ** (i + 1)
-            print(f"  [fetch] {exc} — retry in {wait}s")
-            time.sleep(wait)
+                print(f"  [fetch] rows API unavailable ({exc}) — hub-parquet fallback")
+                return _rows_via_parquet(ds, split)[offset:offset + length]
+            time.sleep(2 ** (i + 1))
 
 
 def validate(prompt, answer):
