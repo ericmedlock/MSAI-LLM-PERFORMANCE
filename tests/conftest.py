@@ -41,10 +41,15 @@ class FakeLLMClient:
         self._delay_s = delay_s
         self.calls: list[dict] = []
 
-    def chat(self, system: str, user: str, *, seed: Optional[int] = None) -> LLMResponse:
+    def chat(
+        self, system: str, user: str, *, seed: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> LLMResponse:
         if self._delay_s:
             time.sleep(self._delay_s)
-        self.calls.append({"system": system, "user": user, "seed": seed})
+        self.calls.append(
+            {"system": system, "user": user, "seed": seed, "temperature": temperature}
+        )
         text = self._responder(system, user, seed)
         return LLMResponse(text=text, tokens_in=self._tokens_in, tokens_out=self._tokens_out)
 

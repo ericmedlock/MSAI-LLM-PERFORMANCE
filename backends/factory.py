@@ -24,6 +24,15 @@ def build_backend(
     if name == "agentic":
         return AgenticBackend(client, prompts, max_loops=config.agentic.max_loops)
     if name == "swarm":
+        import os
+
+        # EXPLORATORY overrides (vault: "Swarm Probe Suite — Design"). Absent =
+        # pinned behavior. Values are stamped into every swarm row's metadata,
+        # so variant data can never masquerade as pinned-config data.
+        peer_temp_env = os.environ.get("SWARM_PEER_TEMP")
+        vote_mode = os.environ.get("SWARM_VOTE", "exact")
+        if vote_mode not in ("exact", "ast"):
+            raise ValueError(f"SWARM_VOTE must be 'exact' or 'ast', got {vote_mode!r}")
         return SwarmBackend(
             client,
             prompts,
@@ -31,6 +40,8 @@ def build_backend(
             tie_break=config.swarm.tie_break,
             base_seed=config.decoding.seed,
             peer_seed_strategy=config.swarm.peer_seed_strategy,
+            peer_temperature=float(peer_temp_env) if peer_temp_env else None,
+            vote_mode=vote_mode,
         )
     raise ValueError(f"unknown backend {name!r}; expected one of {BACKEND_NAMES}")
 

@@ -26,8 +26,13 @@ class LLMResponse:
 class LLMClient(Protocol):
     """The single method every backend uses to talk to the model."""
 
-    def chat(self, system: str, user: str, *, seed: Optional[int] = None) -> LLMResponse:
-        """Return one model turn. ``seed`` overrides the pinned seed when set
+    def chat(
+        self, system: str, user: str, *, seed: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> LLMResponse:
+        """Return one model turn. ``seed`` overrides the pinned seed when set;
+        ``temperature`` overrides the pinned temperature when set (EXPLORATORY
+        swarm variants only — pinned cells never pass it)
         (used by swarm peers to draw diverse-but-reproducible samples)."""
         ...
 
@@ -59,7 +64,10 @@ class OllamaClient:
         self.seed = seed
         self.timeout_s = timeout_s
 
-    def chat(self, system: str, user: str, *, seed: Optional[int] = None) -> LLMResponse:
+    def chat(
+        self, system: str, user: str, *, seed: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> LLMResponse:
         payload = {
             "model": self.model_tag,
             "stream": False,
@@ -68,7 +76,7 @@ class OllamaClient:
                 {"role": "user", "content": user},
             ],
             "options": {
-                "temperature": self.temperature,
+                "temperature": self.temperature if temperature is None else temperature,
                 "num_ctx": self.num_ctx,
                 "num_predict": self.max_tokens,
                 "seed": self.seed if seed is None else seed,
@@ -128,7 +136,10 @@ class OpenAICompatibleClient:
         self.api_key = api_key
         self.timeout_s = timeout_s
 
-    def chat(self, system: str, user: str, *, seed: Optional[int] = None) -> LLMResponse:
+    def chat(
+        self, system: str, user: str, *, seed: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> LLMResponse:
         payload = {
             "model": self.model_tag,
             "stream": False,
@@ -136,7 +147,7 @@ class OpenAICompatibleClient:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": self.temperature,
+            "temperature": self.temperature if temperature is None else temperature,
             "max_tokens": self.max_tokens,
             "seed": self.seed if seed is None else seed,
         }
