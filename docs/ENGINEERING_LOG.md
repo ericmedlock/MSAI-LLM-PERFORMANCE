@@ -237,3 +237,21 @@ The M4 is **~4.6× slower per call (~3.8× fewer tok/s)** on this 14B reasoning 
 why the full 3-backend run projected to ~13–16 h and was scoped to monolithic. This is
 also what surfaced **B6**: at ~10 tok/s a full 6144-token turn exceeds the old 600 s
 client timeout.
+
+### Why ~4×: memory bandwidth, not compute (and it's the *base* M4)
+Token generation is **memory-bandwidth-bound** — each token streams the full ~9 GB (Q4)
+of weights through memory, so decode speed ≈ *bandwidth ÷ model size*. The fingerprint:
+M4 tok/s is **flat at 10.4 ± 1.3** across output lengths from 175 to 6144 tokens — a
+hardware ceiling, not a calibration/config effect. Both machines land near the ceiling
+their bandwidth predicts:
+
+| host | mem bandwidth | ceiling (BW ÷ 9 GB) | observed | % of peak |
+|---|---|---|---|---|
+| base M4 Mini (this box) | ~120 GB/s | 13.3 tok/s | 10.4 | 78% |
+| RTX A4500 (Shadow) | ~640 GB/s | 71 tok/s | 39.0 | 55% |
+
+The raw bandwidth ratio is ~5.3×; it narrows to the observed ~4× because the M4 runs
+closer to its ceiling (78% vs 55%). **Report caveat:** this is the *base* M4 (10 GPU
+cores, ~120 GB/s) — Apple's lowest-bandwidth tier. An M4/M5 **Max** (~400–550 GB/s)
+would be ~1.3× the A4500, i.e. roughly on par. The 4× is a property of *this specific
+low-bandwidth box*, not "Apple Silicon vs a workstation GPU."

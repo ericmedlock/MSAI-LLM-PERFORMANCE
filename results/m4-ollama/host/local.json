@@ -1,9 +1,9 @@
 {
-  "host_id": "7b1eab7a588d",
-  "hostname": "Erics-M4-mini.local",
+  "host_id": "d2c461a39996",
+  "hostname": "Erics-M4-mini",
   "environment": "local",
   "runtime": "metal",
-  "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
   "python": "3.13.11",
   "hardware": {
     "chip": "Apple M4",
@@ -26,5 +26,5 @@
     ]
   },
   "config_hash": "e33a15cdfd8a0c35",
-  "captured_at": "2026-07-12T23:25:52.510964+00:00"
+  "captured_at": "2026-07-13T14:19:32.444019+00:00"
 }
