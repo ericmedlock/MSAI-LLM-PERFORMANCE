@@ -3,7 +3,7 @@
   "hostname": "SHADOW-AK8J40KU",
   "environment": "shadow",
   "runtime": "cuda",
-  "os": "Windows-11-10.0.22621-SP0",
+  "os": "Windows-11-10.0.26200-SP0",
   "python": "3.14.6",
   "hardware": {
     "chip": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
@@ -26,5 +26,5 @@
     ]
   },
   "config_hash": "5031ae81369ce37b",
-  "captured_at": "2026-07-12T19:58:47.814209+00:00"
+  "captured_at": "2026-07-13T14:46:48.363826+00:00"
 }
