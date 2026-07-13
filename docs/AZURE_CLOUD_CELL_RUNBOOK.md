@@ -1,5 +1,9 @@
 # Azure cloud cell (C-M / C-A / C-S) — laptop-driven runbook
 
+> **SUPERSEDED (2026-07-13):** the Azure phase now uses **managed AI services (Azure AI
+> Foundry)** instead of a GPU VM — see `docs/AZURE_FOUNDRY_PHASE.md`. This runbook is
+> retained as the fallback if artifact parity in the cloud is ever required.
+
 The pre-registered **cloud** environment (§7). The harness runs **on the Azure GPU VM** so
 `pynvml` telemetry is GPU-local (VRAM/util/power) — the same reason the Shadow trial existed.
 Drive everything from your **laptop**; the long run executes on the VM detached, so your laptop
