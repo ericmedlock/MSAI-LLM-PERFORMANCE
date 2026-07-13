@@ -178,6 +178,34 @@ def pareto_frontier(
 
 
 # --------------------------------------------------------------------------- #
+# Failure decomposition                                                       #
+# --------------------------------------------------------------------------- #
+def accuracy_decomposition(
+    records: list[dict], group_key: str = "backend"
+) -> dict[str, dict[str, int]]:
+    """Split each group's runs into correct / wrong-answer / no-final-answer.
+
+    'no_answer' rows are those graded incorrect because no final answer could be
+    extracted (``error_category == "format_error"``) — at frontier difficulty the
+    dominant cause is output-budget exhaustion (the model consumed ``max_tokens``
+    mid-reasoning), a different failure mode than a wrong answer and reported
+    separately (vault Engineering Log E8).
+    """
+    out: dict[str, dict[str, int]] = {}
+    for r in records:
+        g = str(r.get(group_key))
+        row = out.setdefault(g, {"n": 0, "correct": 0, "wrong": 0, "no_answer": 0})
+        row["n"] += 1
+        if r.get("correct") is True:
+            row["correct"] += 1
+        elif (r.get("error_category") or "") == "format_error":
+            row["no_answer"] += 1
+        else:
+            row["wrong"] += 1
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Error distribution                                                          #
 # --------------------------------------------------------------------------- #
 def error_distribution(records: list[dict], group_key: str = "backend") -> dict[str, dict[str, int]]:
