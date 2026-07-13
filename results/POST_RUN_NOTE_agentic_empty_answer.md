@@ -1,8 +1,23 @@
 # Post-run note — agentic empty-answer / `format_error` (investigate before HPC N=5)
 
 **Raised:** 2026-07-12, during the Shadow PC frontier-v2 trial (N=1, RTX A4500, Ollama `deepseek-r1:14b`).
-**Status:** OPEN — do **not** edit frozen files (`config/config.yaml`, `tasks/`, `prompts/`) without a
-PRE_REGISTRATION Amendment Log entry. This is a harness/extraction bug hunt, not a science change.
+**Status:** ✅ **RESOLVED 2026-07-12** — root-caused and fixed in `backends/llm_client.py` (no
+pre-registration change). See "Resolution" below.
+
+> **Resolution.** Root cause was **hypothesis 1 (budget exhaustion) surfacing through the client**,
+> not the extraction logic. Ollama 0.31.2 returns a reasoning model's chain-of-thought in a separate
+> **`message.thinking`** field; when generation reaches `num_predict` while still inside the reasoning
+> phase, `message.content` comes back **empty** (`done_reason="length"`) with the entire generation —
+> including any stated final answer — in `thinking`. `OllamaClient.chat` read only `content`, so the
+> answer was lost and auto-graded `format_error`. Reproduced deterministically with `num_predict=300`
+> (`content` len 0, `thinking` len 1172). **Fix:** when `content` is empty/whitespace, fall back to
+> `thinking`. Parsing-only — **no decoding parameter (temperature/num_ctx/num_predict/seed) changed**,
+> so it is not a pre-registration amendment; applies uniformly to all backends. Verified: client unit
+> check (empty→recovered), normal-path unchanged (content still used when present), 114 offline tests
+> pass. The confirmatory N=5 run uses the fixed client. *(The pinned Shadow N=1 rehearsal data
+> predates the fix and is left as-is.)*
+
+*(Original open ticket preserved below for the report record.)*
 
 ## Symptom
 

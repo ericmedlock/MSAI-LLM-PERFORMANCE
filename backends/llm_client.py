@@ -79,7 +79,20 @@ class OllamaClient:
         )
         resp.raise_for_status()
         data = resp.json()
-        text = data.get("message", {}).get("content", "")
+        message = data.get("message", {})
+        text = message.get("content", "") or ""
+        if not text.strip():
+            # Reasoning models (e.g. DeepSeek-R1) on Ollama return their
+            # chain-of-thought in a separate ``thinking`` field. When generation
+            # reaches ``num_predict`` while still inside the reasoning phase,
+            # ``content`` comes back empty (done_reason="length") while the whole
+            # generation — including any stated final answer (\boxed{...}, a last
+            # line, a code block) — sits in ``thinking``. Without this fallback the
+            # answer is silently lost and auto-graded as a format_error. Parsing
+            # only: no decoding parameter (temperature/num_ctx/num_predict/seed) is
+            # touched, so this is not a pre-registration change. Applies uniformly
+            # to every backend.
+            text = message.get("thinking", "") or ""
         return LLMResponse(
             text=text,
             tokens_in=int(data.get("prompt_eval_count", 0)),
