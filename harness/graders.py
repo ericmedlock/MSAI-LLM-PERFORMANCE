@@ -134,6 +134,9 @@ _GRADERS = {
     "math": grade_gsm8k,        # numeric-answer problems
     "code": grade_humaneval,    # unit-test-graded code
     "multihop": grade_hotpotqa,  # normalized string match
+    # exploratory swarm-probe suite (MC letters / short discrete answers):
+    # same normalized-string grader; NOT part of the pre-registered tiers
+    "probe": grade_hotpotqa,
 }
 
 # domains graded by running unit tests (need grading.test + entry_point)
@@ -159,8 +162,29 @@ def vote_key(domain: str, answer: str) -> str:
     """
     if domain in ("gsm8k", "math"):
         return extract_final_number(answer) or ""
-    if domain in ("hotpotqa", "multihop"):
+    if domain in ("hotpotqa", "multihop", "probe"):
         return normalize_text(answer)
     if domain in ("humaneval", "code"):
         return extract_code(answer)
     return (answer or "").strip()
+
+
+def vote_key_ast(domain: str, answer: str) -> str:
+    """EXPLORATORY code vote key: AST-normalized program text.
+
+    Two peers whose code differs only in comments/whitespace/formatting produce
+    the SAME key (variable names still distinguish). Falls back to the exact key
+    when the code does not parse. Non-code domains are unchanged.
+    See vault note "Swarm Probe Suite — Design" (2026-07-13).
+    """
+    if domain not in ("humaneval", "code"):
+        return vote_key(domain, answer)
+    src = extract_code(answer)
+    if not src:
+        return ""
+    try:
+        import ast as _ast
+
+        return _ast.dump(_ast.parse(src))
+    except SyntaxError:
+        return src

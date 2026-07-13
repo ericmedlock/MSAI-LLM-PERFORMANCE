@@ -12,6 +12,7 @@ from pathlib import Path
 
 from harness.analysis import (
     CellSummary,
+    accuracy_decomposition,
     error_distribution,
     pareto_frontier,
     summarize,
@@ -68,8 +69,18 @@ def build_report(records: list[dict], host_profiles: list[dict] | None = None) -
         )
     out.append(
         "- Every metric is mean±std across trials (pre-reg S9). "
-        "Pareto: minimize latency/tokens, maximize accuracy.\n"
+        "Pareto: minimize latency/tokens, maximize accuracy."
     )
+    if any(r.get("task_tier") == "frontier" for r in records):
+        out.append(
+            "- **Reading frontier accuracy:** the frontier tier is calibrated so "
+            "monolithic single-pass accuracy sits in the 0.4–0.7 band — the operating "
+            "point where architecture effects are measurable. Frontier numbers are "
+            "NOT a capability rating; read them alongside the near-ceiling baseline "
+            "tier (task-dependence is the pre-registered hypothesis).\n"
+        )
+    else:
+        out.append("")
 
     metric_header = ["group", "n", "acc", "latency", "tokens(tot)", "actions", "tok/s"]
 
@@ -157,6 +168,29 @@ def build_report(records: list[dict], host_profiles: list[dict] | None = None) -
             _table(["backend", "n", "quality", "judge·correct", "agree·w/·auto"], rows)
         )
         out.append("")
+
+    # 3b) Failure decomposition: wrong answers vs no-final-answer (budget).
+    out.append("## Failure decomposition (wrong vs no-final-answer)\n")
+    out.append(
+        "_'no answer' = no final answer could be extracted (`format_error`); at "
+        "frontier difficulty this is predominantly output-budget exhaustion "
+        "(chain-of-thought consumed `max_tokens`). Distinct from a wrong answer "
+        "and reported separately so 'incorrect' is not conflated with "
+        "'did not finish'._\n"
+    )
+    decomp = accuracy_decomposition(records, "backend")
+    rows = []
+    for b in sorted(decomp):
+        d = decomp[b]
+        n = d["n"] or 1
+        rows.append([
+            b, str(d["n"]),
+            f"{d['correct']} ({d['correct']/n:.0%})",
+            f"{d['wrong']} ({d['wrong']/n:.0%})",
+            f"{d['no_answer']} ({d['no_answer']/n:.0%})",
+        ])
+    out.append(_table(["backend", "n", "correct", "wrong answer", "no answer (budget)"], rows))
+    out.append("")
 
     # 4) Error distribution by architecture.
     out.append("## Error distribution by architecture\n")

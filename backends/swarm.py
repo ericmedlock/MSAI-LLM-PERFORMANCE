@@ -33,7 +33,7 @@ from langgraph.graph import END, START, StateGraph
 
 from backends.base import Backend, BackendResult, Task
 from backends.llm_client import LLMClient
-from harness.graders import vote_key
+from harness.graders import vote_key, vote_key_ast
 from harness.prompts import PromptSet
 
 
@@ -63,6 +63,8 @@ class SwarmBackend(Backend):
         tie_break: str,
         base_seed: int,
         peer_seed_strategy: str = "offset",
+        peer_temperature: float | None = None,
+        vote_mode: str = "exact",
     ) -> None:
         self._client = client
         self._peer_system = prompts.peer_system
@@ -70,6 +72,10 @@ class SwarmBackend(Backend):
         self._tie_break = tie_break
         self._base_seed = base_seed
         self._peer_seed_strategy = peer_seed_strategy
+        # EXPLORATORY knobs (default = pinned behavior; stamped into metadata)
+        self._peer_temperature = peer_temperature
+        self._vote_mode = vote_mode
+        self._vote_key = vote_key_ast if vote_mode == "ast" else vote_key
         self._graph = self._build_graph()
 
     def _peer_seed(self, index: int) -> int:
@@ -81,10 +87,12 @@ class SwarmBackend(Backend):
         async def peer(state: _State) -> dict:
             t0 = time.perf_counter()
             resp = await asyncio.to_thread(
-                self._client.chat,
-                self._peer_system,
-                state["question"],
-                seed=self._peer_seed(index),
+                lambda: self._client.chat(
+                    self._peer_system,
+                    state["question"],
+                    seed=self._peer_seed(index),
+                    temperature=self._peer_temperature,
+                )
             )
             return {
                 "peers": [
@@ -117,7 +125,7 @@ class SwarmBackend(Backend):
 
     def _majority_vote(self, domain: str, peers: list[_PeerOut]) -> tuple[str, dict]:
         ordered = sorted(peers, key=lambda p: p["index"])  # deterministic
-        keys = [vote_key(domain, p["answer"]) for p in ordered]
+        keys = [self._vote_key(domain, p["answer"]) for p in ordered]
         # A peer whose answer has no extractable value (empty vote key) ABSTAINS:
         # it must not be able to win the vote. Otherwise all unparseable peers
         # collapse into one "" group that can outnumber the real answers and the
@@ -140,9 +148,11 @@ class SwarmBackend(Backend):
             "vote_counts": dict(counts),
             "abstained": sum(1 for k in keys if k == ""),
             "all_abstained": all_abstained,
-            "winning_key": vote_key(domain, chosen["answer"]),
+            "winning_key": self._vote_key(domain, chosen["answer"]),
             "tie": len(winners) > 1,
             "chosen_peer_index": chosen["index"],
+            "vote_mode": self._vote_mode,
+            "peer_temp": self._peer_temperature,
         }
 
     def run(self, task: Task) -> BackendResult:

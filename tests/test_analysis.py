@@ -90,3 +90,27 @@ def test_build_report_contains_expected_sections():
 
 def test_build_report_handles_empty():
     assert "No result rows" in build_report([])
+
+
+def test_accuracy_decomposition_buckets():
+    from harness.analysis import accuracy_decomposition
+
+    records = [
+        _rec("monolithic", "t1", True, 1.0),
+        _rec("monolithic", "t2", False, 1.0, err="reasoning_error"),
+        _rec("monolithic", "t3", False, 1.0, err="format_error"),
+        _rec("agentic", "t1", False, 1.0, err="format_error"),
+    ]
+    d = accuracy_decomposition(records, "backend")
+    assert d["monolithic"] == {"n": 3, "correct": 1, "wrong": 1, "no_answer": 1}
+    assert d["agentic"] == {"n": 1, "correct": 0, "wrong": 0, "no_answer": 1}
+
+
+def test_report_includes_failure_decomposition():
+    records = [
+        _rec("monolithic", "t1", False, 1.0, err="format_error"),
+        _rec("swarm", "t1", True, 1.0),
+    ]
+    md = build_report(records)
+    assert "Failure decomposition" in md
+    assert "no answer (budget)" in md
