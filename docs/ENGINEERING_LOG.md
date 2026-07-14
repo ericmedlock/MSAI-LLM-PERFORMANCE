@@ -168,11 +168,16 @@ aggregate.
 
 | architecture | overall | code | math | multihop |
 |---|---|---|---|---|
-| **swarm** | **47%** | 25% | 50% | **75%** |
-| monolithic | 42% | **42%** | 25% | 67% |
-| agentic | 38% | 17% | 42% | 62% |
+| **swarm** | **50%** | 25% | 50% | **75%** |
+| monolithic | 44% | **42%** | 25% | 67% |
+| agentic | 39% | 17% | 42% | 58% |
 
-The model now sits **inside the 0.4–0.7 band** (38–47% overall). Consequences:
+*(Corrected 2026-07-14: the overall column as first written (47/42/38) and agentic
+multihop (62%) did not match the committed 108-row file; recounted from
+`results/frontier-v2-shadow-trial-14b.jsonl` — swarm 18/36, mono 16/36, agentic 14/36,
+agentic multihop 7/12.)*
+
+The model now sits **inside the 0.4–0.7 band** (39–50% overall). Consequences:
 
 - The "monolithic wins" artifact from §1 **disappears** — swarm now leads overall,
   and on **math** and **multihop** both swarm and agentic beat monolithic (voting /

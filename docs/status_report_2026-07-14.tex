@@ -1,0 +1,243 @@
+\documentclass[sigconf,nonacm]{acmart}
+
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\usepackage{booktabs}
+\emergencystretch=3em
+\hbadness=10000
+\sloppy
+
+\begin{document}
+
+\title{Architectures Differentiate --- and Where Their Premises Fail}
+\subtitle{Status Report III --- the confirmatory local cell at $N{=}5$, a protocol-loss counterfactual, and swarm vote anatomy}
+
+\author{Eric Medlock}
+\affiliation{%
+  \institution{University of North Carolina at Charlotte}
+  \department{ITCS 6881 Independent Study}
+  \city{Charlotte}
+  \state{North Carolina}
+  \country{USA}
+}
+\email{emedlock@charlotte.edu}
+
+\begin{abstract}
+The first confirmatory cell of the pre-registered architecture study is complete: the
+frozen frontier tier (v2.1) $\times$ three architectures $\times$ $N{=}5$ on the local
+environment --- 540 runs, every cell exactly 5/5, one config hash. Two validation
+results anchor the report. First, the tier froze at monolithic domain aggregates of
+42/58/67\% and \emph{reproduced} at 43/58/67\% --- the calibration methodology holds on
+the production serving stack. Second, that stack mattered: a pre-sweep check caught the
+v2 code domain drifting from 48\% (LM~Studio) to 35\% (Ollama), forcing a mechanical
+re-source (v2.1, 58\%) and a new guardrail --- \emph{calibration bands are verified on
+the serving stack that produces the study data}. The headline: swarm 61.1\% $>$
+monolithic 56.1\% $>$ agentic 47.2\%, at 3.0$\times$ and 1.9$\times$ monolithic's token
+cost respectively. Both multi-agent results, however, decompose into mechanism findings
+rather than architecture wins. Agentic's deficit is partly \emph{protocol-compliance
+loss}: the reasoning model buries its APPROVE verdict mid-prose, the framework's
+first-line parser misses it, and the resulting ``false revision'' loops destroy
+correct, already-approved answers. A pre-declared counterfactual re-parse of saved
+traces recovers agentic math from 33\% to 42\% --- parity with monolithic --- while
+code and multihop are untouched: the residual gap is real architecture cost. Swarm's
+win dissolves under vote anatomy: across all 180 swarm rows the vote is never
+genuinely contested (three 2--1 code splits from serving jitter aside); its multihop
+edge comes from two tasks flipped deterministically by the peer prompt. At
+temperature~0 the pre-registered swarm is a system-prompt ablation at triple cost, not
+an ensemble --- motivating a proposed SWARM~2.0 arm (peers at $T{>}0$), its amendment
+drafted for logging before any of its data exist. Scope has shifted: the confirmatory
+environments are Apple Metal (M5~Max, M4) and university HPC (CUDA), whose sweep is
+running as this report is written; the Azure cell is reframed from a GPU~VM to an
+\emph{exploratory managed-inference arm} (Azure AI Foundry, serverless DeepSeek-R1)
+to run in parallel with SWARM~2.0.
+\end{abstract}
+
+\maketitle
+
+\section{Context and changes since Report II}
+Design, hypotheses, and metrics remain frozen in \texttt{PRE\_REGISTRATION.md}
+(2026-07-01); every deviation is amendment-logged. Since Report~II (2026-07-09):
+
+\textbf{Serving stack pinned to Ollama; tier re-frozen as v2.1.} All remaining
+environments serve via native Ollama (CUDA boxes and HPC have no LM~Studio path). A
+production-stack calibration check --- monolithic $N{=}5$ over the frozen v2 code
+domain --- measured \textbf{35\% on Ollama vs.\ 48\% in the original LM~Studio
+calibration}. The drift is real (same 4 items solid, 7 floored) and out-of-band, so the
+domain re-sourced mechanically under the domain-aggregate rule: v2.1 code is a
+deterministic 6+6 mix of first-validating BigCodeBench-Hard and BigCodeBench items,
+which calibrated to \textbf{58\% in band on Ollama} (7 items solved, 5 unsolved).
+Math and multihop carry unchanged. Methodological consequence, now a guardrail:
+difficulty is relative not only to the \emph{model} (Report~II) but to the
+\emph{serving stack}; bands are verified on the production stack before any
+multi-architecture sweep.
+
+\textbf{Environment scope reshaped.} The pre-registered Azure cell is reframed
+(amendment pending advisor confirmation): a rented GPU VM would duplicate the HPC
+cell's serving stack on worse hardware, so the confirmatory environments are Apple
+Metal (M5~Max primary; M4~Mini as a cross-hardware point) and university HPC (NVIDIA
+A40, CUDA). Azure re-enters as an \emph{exploratory} managed-inference arm instead:
+Azure AI Foundry's serverless full DeepSeek-R1 (the 14B distill is not
+serverless-deployable), which cannot hold the pinned artifact --- precision, batching,
+and decoding are not controllable --- and is therefore framed as ``self-hosted pinned
+artifact vs.\ managed serving stack,'' measuring accuracy deltas, latency
+distribution, determinism at temperature~0, and \$/token (verified pricing
+\$1.35/\$5.40 per~M tokens; a full $N{=}5$ sweep estimates $\sim$\$27). A Shadow
+cloud-PC (RTX~A4500) served as the CUDA rehearsal environment ($N{=}1$, 2026-07-12),
+validating NVML telemetry and surfacing two harness fixes (the CUDA telemetry
+dependency install; the reasoning-model \texttt{thinking}-field answer recovery)
+before the confirmatory runs.
+
+\section{Confirmatory local cell: 540 runs}
+Frozen v2.1 tier (36 items) $\times$ 3 architectures $\times$ $N{=}5$ on the M5~Max
+(48\,GB, Metal, Ollama). Integrity: all 108 cells exactly 5/5 trials, single config
+hash, zero missing rows. Failure mix: 211 reasoning errors, 23 budget exhaustions,
+10 code-harness (tool) errors.
+
+\begin{table}[h]
+\caption{Local confirmatory cell ($N{=}5$): accuracy by domain, and mean cost.}
+\label{tab:n5}
+\begin{tabular}{lrrrr}
+\toprule
+ & Math & Code & Multihop & \textbf{Overall}\\
+\midrule
+Monolithic & \textbf{43\%} & \textbf{58\%} & 67\% & 56.1\%\\
+Agentic    & 33\% & 50\% & 58\% & 47.2\%\\
+Swarm      & 42\% & \textbf{58\%} & \textbf{83\%} & \textbf{61.1\%}\\
+\midrule
+\multicolumn{5}{l}{\small Mean output tokens/run: 2755 / 5148 / 8177 (1$\times$ / 1.9$\times$ / 3.0$\times$)}\\
+\multicolumn{5}{l}{\small Median latency/run: 48\,s / 88\,s / 140\,s at $\sim$43 tok/s (Metal)}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{The calibration reproduced.} Monolithic domain aggregates landed at
+43/58/67\% against calibration's 42/58/67\% --- a one-point deviation in one domain
+across 180 fresh runs. The tier holds its band placement on the production stack; the
+pre-declared selection rule measured what it claimed to measure.
+
+\section{Mechanism finding 1: the false revision}
+Agentic trails everywhere --- but instrumentation shows part of the deficit is not the
+\emph{architecture} at all. The pinned verifier prompt demands the verdict on the first
+line (``APPROVE or REVISE''); the backend parses it with
+\texttt{startswith("APPROVE")}. DeepSeek-R1 explains first and verdicts later, so
+verbal approvals routinely fail the parse; worse, any verifier turn that exhausts the
+token budget returns chain-of-thought (the empty-content fallback), which
+\emph{structurally} cannot begin with APPROVE. Each ``false revision'' forces another
+Executor$\to$Verifier loop against an already-approved answer; the loop frequently
+ends with an empty final answer. In the cleanest exhibit the executor answered 70
+(gold: 70), the verifier wrote ``\ldots is indeed 70. APPROVE'', and all five trials
+scored zero.
+
+Per a pre-declared amendment (logged before any counterfactual number was computed), a
+mechanical re-parse of the saved traces asks what each agentic row would have scored
+under lenient verdict reading (last standalone APPROVE/REVISE token decides; the
+approved candidate is graded by the pinned grader; primary rows untouched).
+
+\begin{table}[h]
+\caption{Agentic: pinned vs.\ counterfactual (local $N{=}5$).}
+\label{tab:cf}
+\begin{tabular}{lrrr}
+\toprule
+Domain & Pinned & Counterfactual & $\Delta$\\
+\midrule
+Math     & 33\% & 42\% & +8.3\,pts\\
+Code     & 50\% & 50\% & 0\\
+Multihop & 58\% & 58\% & 0\\
+\textbf{Overall} & 47.2\% & 50.0\% & +2.8\,pts\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Five rows flip, all math, all wrong$\to$right; none flip down. The decomposition is
+sharp: on math, protocol loss explains agentic's \emph{entire} deficit (counterfactual
+42\% = parity with monolithic 43\% and swarm 42\%); on code and multihop the gap is
+genuine architecture cost --- verifier judgment errors and revision-loop budget burn.
+The general lesson: agentic is the only architecture whose \emph{control flow} runs
+through model prose, and reasoning models are unreliable at strict output protocols;
+frameworks that key control flow on exact tokens silently convert approvals into
+destructive revision loops.
+
+\section{Mechanism finding 2: swarm never votes}
+Report~II's exploratory data hinted the swarm's majority vote might be inert at
+temperature~0; the confirmatory cell settles it. Across all 180 swarm rows: no
+genuinely contested votes (60/60 math and 60/60 multihop unanimous or single-key;
+three 2--1 code splits from serving jitter; 28 math abstention events from correlated
+budget exhaustion --- all three peers truncating together in 8 of the 10 affected
+rows). Greedy decoding ignores the
+per-peer seed offsets, so the peers are near-clones and the pre-registered
+``independent samples'' premise fails mechanically.
+
+The headline multihop win (83\% vs.\ 67\%) reduces to exactly two tasks, each flipped
+0/5$\to$5/5 deterministically by the peer \emph{prompt}: one where the peer prompt
+elicits a different reasoning path (monolithic answers the wrong hop), and one of
+answer specificity (monolithic's under-specified league name fails the string grader;
+peers emit the full name). At temperature 0 the pre-registered swarm is a
+system-prompt ablation at 3$\times$ cost, not an ensemble.
+
+Consequence: a \textbf{SWARM 2.0} arm is proposed, its amendment drafted for logging
+\emph{before any of its data exist} --- identical topology, prompts, and tasks, but
+peers decode at $T{>}0$ with per-peer seeds (temperature chosen by a small
+pre-declared probe), restoring the premise the majority vote requires. Swarm-1.0 rows remain the valid measurement of the
+pre-registered design; the paper reports them as a diagnosed negative result with the
+vote-anatomy evidence above.
+
+\section{Cross-hardware reproducibility}
+Three environments have now run the frontier tier at the pinned 14B:
+
+\begin{table}[h]
+\caption{Cross-environment view (v2.1 except Shadow = v2; $N$ as shown).}
+\label{tab:xenv}
+\begin{tabular}{llrrr}
+\toprule
+Env (accel.) & $N$ & Mono & Agentic & Swarm\\
+\midrule
+M5 Max (Metal)   & 5 & 56\% & 47\% & 61\%\\
+M4 Mini (Metal)  & 1 & 58\% & --- & 61\%\\
+Shadow A4500 (CUDA, v2) & 1 & 44\% & 39\% & 50\%\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Aggregates reproduce across accelerators and boxes (the Shadow cell ran the earlier v2
+code domain, depressing its absolute numbers); per-item results do not reproduce at
+$N{=}1$ --- temperature 0 does not force identical outputs across Metal and CUDA.
+Decode throughput is memory-bandwidth arithmetic: the base M4 ($\sim$120\,GB/s) holds
+$\sim$10.4 tok/s on the 9\,GB Q4 model, the M5~Max $\sim$43 tok/s, the A4500
+($\sim$640\,GB/s) $\sim$39 tok/s --- each near the ceiling its bandwidth predicts.
+
+\section{Secondary metric: LLM-as-judge}
+The different-family judge (Llama-3.2-3B) processed all 540 rows (535 parseable
+verdicts): judge-correct 83 / 83 / 86\% and mean quality 3.63 / 3.67 / 3.81 (of 4)
+for monolithic / agentic / swarm. The
+3B judge is systematically lenient against the binary grader but preserves the
+ordering; it serves as corroboration, not as a result.
+
+\section{Threats to validity}
+Single model family; two accelerator classes but one vendor stack (Ollama) by design
+--- stack effects are now a documented, guarded variable rather than an assumption.
+The agentic counterfactual is post-hoc (though rule-fixed before computation) and
+reported alongside, never instead of, the pinned metric. Swarm-1.0's inertness means
+the study so far bounds only \emph{prompt} effects of the swarm topology;
+ensemble effects await SWARM~2.0. Cross-domain accuracy comparisons remain
+descriptive (bands sit at 42/58/67\%). $N{=}5$ at temperature 0 measures serving
+jitter, not sampling variance.
+
+\section{Next steps}
+(1)~HPC confirmatory sweep (A40, CUDA): running now, ETA within the day; data intake,
+integrity checks, the same counterfactual re-parse, judge pass, and analysis follow.
+(2)~SWARM~2.0: temperature probe, amendment, then the corrected cell on HPC ---
+run \emph{in parallel with} (3)~the Azure AI Foundry exploratory arm (thin
+OpenAI-compatible client, per-row cost accounting, $N{=}1$ cost pilot first).
+(4)~Full paper draft from the assembled findings. (5)~Stretch (time permitting, in
+priority order): a framework-as-agentic-layer A/B (LangChain/CrewAI vs.\ the
+hand-rolled loop --- a direct extension of the false-revision finding), HPC scaling
+legs (32B, Qwen3.6-35B), and a budget-sensitivity leg at max\_tokens 12288.
+
+\vspace{1em}
+\noindent\textit{All raw rows, traces, amendments, the counterfactual script
+(\texttt{scripts/agentic\_counterfactual.py}), and judge outputs are committed; every
+number in this report is reproducible from \texttt{results/} at the repository head.}
+
+\end{document}
