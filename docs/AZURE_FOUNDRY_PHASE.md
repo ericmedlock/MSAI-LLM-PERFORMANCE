@@ -46,16 +46,21 @@ itself is a finding), and **$/token vs. GPU-hours**.
   - hardware telemetry fields explicitly `null` with a documented reason
     (no NVML on someone else's fleet).
 
-### Model choice (verify first — step 1 of execution)
+### Model choice — VERIFIED 2026-07-14
 
-Check whether **DeepSeek-R1-Distill-Qwen-14B** is serverless-deployable in the Foundry
-model catalog (historically the distills were managed-compute-only / region-spotty).
-Fallback decision, leaning **same-family-bigger**:
+**The 14B distill is NOT serverless in Foundry** — Microsoft ships the R1 distills
+(1.5B/7B/14B) for *local/edge* deployment via the AI Toolkit, not as serverless
+endpoints. The **full DeepSeek-R1 IS serverless** in the Foundry catalog
+(US regions incl. East US / East US 2 / West US 3), priced **$1.35 / M input +
+$5.40 / M output tokens** (verified vs. Azure pricing page, June 2026 figures;
+re-check at provisioning time). 128k context, up to 8,192 output tokens —
+covers the pinned num_ctx 8192 / max_tokens 6144 envelope.
 
-| option | pro | con |
-|---|---|---|
-| **full DeepSeek-R1 serverless** (preferred fallback) | same family — "what does the managed stack do to this family" | bigger model, dearer per token |
-| Phi-4-reasoning (~14B) | size-matched, cheap | different family — muddier comparison |
+**Decision: full DeepSeek-R1 serverless** (same family, "what does the managed stack
+do to this family"). Cost envelope for the sweep: local N=5 averaged ~8.7k output
+tokens/run across backends → 540 runs ≈ 4.7M output + ~1M input ≈ **~$27 for a full
+N=5 cell** (N=1 pilot ≈ $6). Well inside the $100 credit. Rejected alternative:
+Phi-4-reasoning (size-matched but different family — muddier comparison).
 
 ## Layer 2 — AI-102 practice (exploratory / content, never confirmatory)
 
