@@ -29,6 +29,25 @@ def test_unknown_backend_rejected(config, prompts):
         build_backend("mixture", client=FakeLLMClient(), config=config, prompts=prompts)
 
 
+def test_agentic_verdict_defaults_to_strict(config, prompts, monkeypatch):
+    monkeypatch.delenv("AGENTIC_VERDICT", raising=False)
+    a = build_backend("agentic", client=FakeLLMClient(), config=config, prompts=prompts)
+    assert a._verdict_mode == "strict"
+
+
+def test_agentic_verdict_env_enables_lenient(config, prompts, monkeypatch):
+    # AGENTIC 2.0 knob (Amendment 2026-07-14) — exploratory, opt-in via env
+    monkeypatch.setenv("AGENTIC_VERDICT", "lenient")
+    a = build_backend("agentic", client=FakeLLMClient(), config=config, prompts=prompts)
+    assert a._verdict_mode == "lenient"
+
+
+def test_agentic_verdict_rejects_unknown_mode(config, prompts, monkeypatch):
+    monkeypatch.setenv("AGENTIC_VERDICT", "fuzzy")
+    with pytest.raises(ValueError, match="AGENTIC_VERDICT"):
+        build_backend("agentic", client=FakeLLMClient(), config=config, prompts=prompts)
+
+
 def test_build_client_selects_openai_for_lmstudio_local(config, monkeypatch):
     for var in ("LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL"):
         monkeypatch.delenv(var, raising=False)

@@ -24,10 +24,19 @@ def build_backend(
     if name == "monolithic":
         return MonolithicBackend(client, prompts)
     if name == "agentic":
-        return AgenticBackend(client, prompts, max_loops=config.agentic.max_loops)
+        # EXPLORATORY override (Amendment 2026-07-14, "AGENTIC 2.0"). Absent =
+        # pinned strict first-line verdict parse. The mode is stamped into every
+        # agentic row's metadata, so variant data can never masquerade as
+        # pinned-config data (same policy as the swarm knobs below).
+        verdict_mode = os.environ.get("AGENTIC_VERDICT", "strict")
+        if verdict_mode not in ("strict", "lenient"):
+            raise ValueError(
+                f"AGENTIC_VERDICT must be 'strict' or 'lenient', got {verdict_mode!r}"
+            )
+        return AgenticBackend(
+            client, prompts, max_loops=config.agentic.max_loops, verdict_mode=verdict_mode
+        )
     if name == "swarm":
-        import os
-
         # EXPLORATORY overrides (vault: "Swarm Probe Suite — Design"). Absent =
         # pinned behavior. Values are stamped into every swarm row's metadata,
         # so variant data can never masquerade as pinned-config data.

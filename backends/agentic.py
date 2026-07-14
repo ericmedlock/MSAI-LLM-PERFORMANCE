@@ -9,6 +9,7 @@ contrast with the parallel, controller-free swarm.
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Optional, TypedDict
 
@@ -17,6 +18,12 @@ from langgraph.graph import END, START, StateGraph
 from backends.base import Backend, BackendResult, Task
 from backends.llm_client import LLMClient
 from harness.prompts import PromptSet
+
+# Standalone verdict tokens for the "lenient" mode (AGENTIC 2.0, Amendment
+# 2026-07-14): the LAST occurrence decides; neither present -> REVISE. This is
+# byte-identical to the rule in scripts/agentic_counterfactual.py, which
+# validated it against 190 saved agentic traces (0 right->wrong flips).
+_VERDICT_TOKEN = re.compile(r"\b(APPROVE|REVISE)\b")
 
 
 class _State(TypedDict):
@@ -34,12 +41,28 @@ class _State(TypedDict):
 class AgenticBackend(Backend):
     name = "agentic"
 
-    def __init__(self, client: LLMClient, prompts: PromptSet, max_loops: int) -> None:
+    def __init__(
+        self,
+        client: LLMClient,
+        prompts: PromptSet,
+        max_loops: int,
+        verdict_mode: str = "strict",
+    ) -> None:
         self._client = client
         self._executor_system = prompts.executor_system
         self._verifier_system = prompts.verifier_system
         self._max_loops = max_loops
+        # "strict" = pinned first-line parse. "lenient" = AGENTIC 2.0 variant:
+        # reasoning models bury the verdict mid-prose, turning approvals into
+        # destructive revision loops ("false revisions", engineering log §8).
+        self._verdict_mode = verdict_mode
         self._graph = self._build_graph()
+
+    def _parse_verdict(self, text: str) -> bool:
+        if self._verdict_mode == "lenient":
+            hits = _VERDICT_TOKEN.findall(text.upper())
+            return bool(hits) and hits[-1] == "APPROVE"
+        return text.strip().upper().startswith("APPROVE")
 
     # -- nodes -------------------------------------------------------------- #
     def _executor(self, state: _State) -> dict:
@@ -68,7 +91,7 @@ class AgenticBackend(Backend):
             f"Candidate answer:\n{state['candidate']}"
         )
         resp = self._client.chat(self._verifier_system, user)
-        approved = resp.text.strip().upper().startswith("APPROVE")
+        approved = self._parse_verdict(resp.text)
         feedback = None if approved else resp.text.strip()
         return {
             "approved": approved,
@@ -121,5 +144,8 @@ class AgenticBackend(Backend):
                 "executor_loops": final["loop"],
                 "verifier_approved": final["approved"],
                 "llm_calls": final["actions"],
+                # Stamped on every row so AGENTIC 2.0 variant data can never
+                # masquerade as pinned-config data (same policy as swarm knobs).
+                "verdict_mode": self._verdict_mode,
             },
         )

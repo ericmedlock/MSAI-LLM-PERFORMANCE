@@ -60,6 +60,64 @@ def test_agentic_respects_max_loops_when_never_approved(prompts):
     assert result.action_count == 4
 
 
+def test_agentic_strict_misses_prose_buried_approve(prompts):
+    """Pinned behavior (the 'false revision', engineering log §8): a verdict
+    that does not START with APPROVE parses as a revision request."""
+
+    def responder(system, user, seed):
+        if system == prompts.verifier_system:
+            return "The candidate answer is correct. APPROVE\n\n$\\boxed{70}$"
+        return "the answer is 70"
+
+    client = FakeLLMClient(responder)
+    result = AgenticBackend(client, prompts, max_loops=2).run(GSM)
+    assert result.metadata["verifier_approved"] is False
+    assert result.metadata["verdict_mode"] == "strict"
+    assert result.metadata["executor_loops"] == 2  # forced extra loop
+
+
+def test_agentic_lenient_hears_prose_buried_approve(prompts):
+    """AGENTIC 2.0 (Amendment 2026-07-14): the last standalone APPROVE/REVISE
+    token decides, so the same prose-buried approval stops the loop."""
+
+    def responder(system, user, seed):
+        if system == prompts.verifier_system:
+            return "The candidate answer is correct. APPROVE\n\n$\\boxed{70}$"
+        return "the answer is 70"
+
+    client = FakeLLMClient(responder)
+    result = AgenticBackend(client, prompts, max_loops=2, verdict_mode="lenient").run(GSM)
+    assert result.metadata["verifier_approved"] is True
+    assert result.metadata["verdict_mode"] == "lenient"
+    assert result.metadata["executor_loops"] == 1  # no false revision
+    assert result.action_count == 2
+
+
+def test_agentic_lenient_last_token_decides(prompts):
+    # APPROVE appears first but the verifier's final verdict is REVISE
+    def responder(system, user, seed):
+        if system == prompts.verifier_system:
+            return "I considered APPROVE at first, but the sum is wrong. REVISE"
+        return "attempted answer 70"
+
+    client = FakeLLMClient(responder)
+    result = AgenticBackend(client, prompts, max_loops=2, verdict_mode="lenient").run(GSM)
+    assert result.metadata["verifier_approved"] is False
+
+
+def test_agentic_lenient_neither_token_means_revise(prompts):
+    # Chain-of-thought fallback text (no verdict token at all) must not approve;
+    # 'APPROVED' must not match the standalone APPROVE token either.
+    def responder(system, user, seed):
+        if system == prompts.verifier_system:
+            return "Okay, so I need to check whether 48 clips... this looks APPROVED-ish"
+        return "attempted answer 70"
+
+    client = FakeLLMClient(responder)
+    result = AgenticBackend(client, prompts, max_loops=2, verdict_mode="lenient").run(GSM)
+    assert result.metadata["verifier_approved"] is False
+
+
 def test_swarm_dispatches_num_agents_and_majority_votes(prompts):
     # two peers say 72, one says 5 -> majority 72
     answers = {0: "final 72", 1: "final 72", 2: "final 5"}
