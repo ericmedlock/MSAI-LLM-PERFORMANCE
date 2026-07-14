@@ -21,9 +21,10 @@
     "backend_model": "deepseek-r1:14b",
     "judge_model": "llama-3.2-3b-instruct",
     "models_available": [
+      "llama3.2:3b",
       "deepseek-r1:14b"
     ]
   },
   "config_hash": "e33a15cdfd8a0c35",
-  "captured_at": "2026-07-14T13:11:19.759593+00:00"
+  "captured_at": "2026-07-14T19:01:11.332518+00:00"
 }
