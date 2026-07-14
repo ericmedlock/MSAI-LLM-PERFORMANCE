@@ -5,7 +5,7 @@ validation trials performed while building the harness and running the
 multi-machine study. Written for inclusion in the final report. Companion to
 `PRE_REGISTRATION.md` (frozen design) and `docs/TASK_TIERS.md`.
 
-Last updated: 2026-07-12.
+Last updated: 2026-07-14.
 
 ---
 
@@ -255,3 +255,86 @@ closer to its ceiling (78% vs 55%). **Report caveat:** this is the *base* M4 (10
 cores, ~120 GB/s) — Apple's lowest-bandwidth tier. An M4/M5 **Max** (~400–550 GB/s)
 would be ~1.3× the A4500, i.e. roughly on par. The 4× is a property of *this specific
 low-bandwidth box*, not "Apple Silicon vs a workstation GPU."
+
+---
+
+## 8. Agentic "false revision" — the verifier approves, the framework doesn't hear it
+
+**Discovered 2026-07-14** by live-monitoring the in-flight local v2.1 confirmatory
+sweep, investigating why agentic trailed monolithic/swarm by 10–25 points on math.
+
+### 8.1 Mechanism
+
+The pinned verifier prompt (`prompts/agentic/verifier_system.txt`) requires the
+verdict on the **first line** ("either APPROVE or REVISE"), and the backend parses it
+literally — `backends/agentic.py`:
+
+```python
+approved = resp.text.strip().upper().startswith("APPROVE")
+```
+
+DeepSeek-R1 is a reasoning model: it explains first and verdicts later, so its
+approvals routinely fail `startswith`. Two paths produce the failure:
+
+1. **Protocol non-compliance in visible output** — the verifier writes
+   "The candidate answer correctly … APPROVE … $\boxed{70}$": verbally an approval,
+   parsed as a revision request.
+2. **Thinking-fallback text** — when a verifier turn exhausts `max_tokens`, the
+   Ollama `thinking` fallback (§B5-adjacent, `backends/llm_client.py`) returns raw
+   chain-of-thought as the turn text. CoT never begins with "APPROVE", so an
+   exhausted verifier turn is *structurally guaranteed* to parse as REVISE.
+
+A false revision then forces another Executor→Verifier loop: the executor is told to
+revise an already-approved answer, each turn draws from a fresh 6144-token budget
+(compounding the §5/§7 exhaustion mode), and the run frequently ends with an **empty
+final answer** — a correct, verbally-approved draft destroyed by the loop that was
+supposed to protect it.
+
+### 8.2 Evidence (local v2.1 sweep, snapshot at 95 agentic rows)
+
+- **20/95 agentic rows (21%)**: first verifier turn contains APPROVE but parsed
+  `approved: false`. 15 of the 20 scored wrong.
+- **≥5 math rows**: executor draft **correct** AND verifier verbally approved —
+  row still scored 0.
+- Cleanest exhibit, `fx2-mathA-001` (gold: 70), identical in all 5 trials (temp 0):
+  executor → "$\boxed{70}$" ✓; verifier → "…is indeed 70. APPROVE. $\boxed{70}$";
+  trace records `approved: false`; loop 2 runs; final answer: **empty**
+  (`format_error`, 9,965 tokens spent).
+- Cost signature: agentic averages **8,463 output tokens/run vs monolithic's 4,436**
+  — 2× the spend for negative marginal accuracy. Swarm spends more still (13,281)
+  but its peers are near-clones at temp 0 (see the swarm-voting finding, wiki E12:
+  greedy decoding ignores the per-peer seed offsets), so it effectively re-runs
+  monolithic and inherits monolithic's accuracy — whereas agentic's control flow
+  can actively *destroy* a correct answer through the parse gap. Same tokens
+  wasted, asymmetric damage.
+- Back-of-envelope: recovering the false-revision rows would lift agentic from ~29%
+  to roughly monolithic parity on the rows collected so far.
+
+### 8.3 Decision — no mid-run fix; pre-declared counterfactual instead
+
+The prompt and the parse rule are **pinned** (bytes hashed into every row) and every
+environment (v1 baseline, Shadow, M4, local, HPC) runs identical code — a mid-run
+"fix" would fork the dataset and destroy cross-environment comparability. Instead
+(Amendment Log, 2026-07-14):
+
+- **Primary metric unchanged** — it measures the framework *as deployed*.
+- **Secondary counterfactual re-parse over saved traces**, rule fixed before any
+  result was computed: replay each agentic trace; at the first verifier turn whose
+  *lenient* verdict is APPROVE (last standalone APPROVE/REVISE token in the visible
+  text decides; neither → REVISE), grade that turn's candidate with the pinned
+  grader; otherwise keep the recorded outcome. Report both numbers side by side.
+- Optional exploratory arm later (post-confirmatory, env-flag-stamped like the swarm
+  probe knobs): rerun with lenient parsing live, to measure the loop's value when
+  the approval channel actually works.
+
+### 8.4 Why this is a finding, not just a bug
+
+The failure is the *interaction* between (a) reasoning models' weak compliance with
+strict output protocols and (b) agent frameworks that key on exact tokens for
+control flow. Monolithic and swarm are structurally immune — nothing in their paths
+parses a control token from model text; majority voting needs only comparable
+answers. The agentic architecture is the only one whose **control flow** runs
+through the model's prose, and that channel is exactly what a reasoning model's
+style (and the thinking-field failure mode) corrupts. For the paper: part of
+"agentic underperforms" decomposes into *verifier judgment cost* vs
+*protocol-compliance loss* — the counterfactual separates the two.
