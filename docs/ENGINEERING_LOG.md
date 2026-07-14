@@ -204,39 +204,45 @@ Two distinct layers, not to be conflated:
 
 ---
 
-## 7. M4 Mini (Apple Metal) monolithic cell — completed
+## 7. M4 Mini (Apple Metal) cell — completed (frontier-v2.1, monolithic + swarm)
 
-**M4 Mini (Metal, 24 GB), Ollama, deepseek-r1:14b, frozen frontier-v2, monolithic, N=1.**
-Scoped to monolithic-only — the full 3-backend run was ~13–16 h on this box (see
-latency below), and the M4 cell's value is (a) a cross-hardware **reproducibility
-check** and (b) an **Apple-Metal-vs-CUDA latency** point, both of which a single-pass
-cell delivers. Output isolated under `results/m4-ollama/`.
+**M4 Mini (Metal, 24 GB), Ollama, deepseek-r1:14b, frozen frontier-v2.1, monolithic +
+swarm, N=1.** Originally run on v2, then **realigned to v2.1** after the study re-sourced
+the code domain (v2 code drifted to 33% on this Ollama stack — below band; v2.1 lands it
+at 58%). Math + multihop task_ids are identical across v2/v2.1, so those monolithic rows
+were kept; only code was re-run, plus swarm across all 36. Agentic was dropped on M4
+(~27 min/cell → ~a day; left to Shadow/HPC). Output:
+`results/m4-ollama/frontier-v2.1-m4-ollama-14b.jsonl` (72 rows, 0 errors).
 
-### Accuracy — identical 36 frozen items, temp 0 (reproducibility check)
-| domain | M4 (Metal) | Shadow (CUDA) |
+### Accuracy — monolithic vs swarm (architecture comparison), N=1
+| domain | monolithic | swarm |
 |---|---|---|
-| math (AIME 2025) | 6/12 = 50% | 3/12 = 25% |
-| code (BigCodeBench-Hard) | 4/12 = 33% | 5/12 = 42% |
-| multihop (MuSiQue+context) | 8/12 = 67% | 8/12 = 67% |
-| **overall** | **18/36 = 50%** | **16/36 = 44%** |
+| math (AIME 2025) | 6/12 = 50% | 5/12 = 42% |
+| code (v2.1 re-source) | 7/12 = 58% | 7/12 = 58% |
+| multihop (MuSiQue) | 8/12 = 67% | **10/12 = 83%** |
+| **overall** | **21/36 = 58%** | **22/36 = 61%** |
 
-Aggregate accuracy is close (50% vs 44%, both near the N=5 calibration of 52%) and
-**multihop is identical**. The math/code per-domain swings are **N=1 sampling noise**:
-temp 0 does *not* force identical single outputs across Metal and CUDA — a small early
-divergence in the reasoning chain flips the final answer — but the distributions line
-up. **Takeaway:** for this reasoning model, cross-accelerator results reproduce *in
-aggregate*, not *per-item*; per-item cross-hardware comparisons need N > 1.
+- **Swarm edges monolithic overall (61% vs 58%)**, driven entirely by **multihop
+  (83% vs 67%)** — parallel voting helps most where single passes are shaky but not
+  hopeless. Code ties; math is within N=1 noise (swarm slightly lower).
+- **Code validated in band at 58%** (was 33% on v2) — direct confirmation the v2.1
+  re-source fixed the cross-stack drift on Ollama; all three domains now sit in/near
+  the [0.4, 0.7] band, so the tier can differentiate architectures.
+- N=1 → per-domain deltas are noisy, but the overall swarm ≥ monolithic direction
+  matches the Shadow trend. Cross-hardware reproducibility spot-check held: monolithic
+  math is 50% on both M4 and the (early) M5 Max v2.1 N=5 run.
 
 ### Latency — the Apple-Metal cost
-| host | median / call | throughput | wall (36 monolithic) |
+| host | median / call | throughput | wall |
 |---|---|---|---|
-| M4 Mini (Metal, 24 GB) | 322 s | ~10.4 tok/s | 3.1 h |
-| Shadow (RTX A4500, CUDA) | 71 s | ~39 tok/s | 0.7 h |
+| M4 Mini (Metal, 24 GB) | 322 s (mono) | ~10.4 tok/s | mono 3.1 h; +swarm ~9 min/cell → full cell ~13 h |
+| Shadow (RTX A4500, CUDA) | 71 s | ~39 tok/s | monolithic 0.7 h |
 
-The M4 is **~4.6× slower per call (~3.8× fewer tok/s)** on this 14B reasoning workload —
-why the full 3-backend run projected to ~13–16 h and was scoped to monolithic. This is
-also what surfaced **B6**: at ~10 tok/s a full 6144-token turn exceeds the old 600 s
-client timeout.
+Swarm's 3 peers **serialize** on a single Ollama instance (one model, one generation at
+a time), so a swarm cell ≈ 3× a monolithic turn. The M4 is **~4.6× slower per call
+(~3.8× fewer tok/s)** on this 14B reasoning workload — why agentic (up to ~4 calls/cell)
+was dropped. This also surfaced **B6**: at ~10 tok/s a full 6144-token turn exceeds the
+old 600 s client timeout.
 
 ### Why ~4×: memory bandwidth, not compute (and it's the *base* M4)
 Token generation is **memory-bandwidth-bound** — each token streams the full ~9 GB (Q4)
