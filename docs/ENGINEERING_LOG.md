@@ -333,7 +333,34 @@ environment (v1 baseline, Shadow, M4, local, HPC) runs identical code — a mid-
   probe knobs): rerun with lenient parsing live, to measure the loop's value when
   the approval channel actually works.
 
-### 8.4 Why this is a finding, not just a bug
+### 8.4 Counterfactual results (run 2026-07-14, after the local sweep completed)
+
+`scripts/agentic_counterfactual.py`, rule exactly as pre-declared. Agentic rows only;
+pinned numbers are the primary metric and remain the headline.
+
+| environment | domain | pinned | counterfactual | delta |
+|---|---|---|---|---|
+| local (N=5) | math | 20/60 = 33% | 25/60 = 42% | **+8.3 pts** |
+| local (N=5) | code | 30/60 = 50% | 30/60 = 50% | 0 |
+| local (N=5) | multihop | 35/60 = 58% | 35/60 = 58% | 0 |
+| local (N=5) | **overall** | 85/180 = 47.2% | 90/180 = 50.0% | +2.8 pts |
+| shadow (N=1) | overall | 14/36 = 39% | 14/36 = 39% | 0 |
+
+5 flips, all local, all math, all wrong→right; **zero right→wrong** (the lenient rule
+never damaged a recorded success). Interpretation:
+
+- On **math**, protocol-compliance loss explains agentic's *entire* deficit: the
+  counterfactual (42%) lands at parity with monolithic (43%) and swarm (42%).
+  The false-revision loop was destroying correct, approved AIME answers.
+- On **code and multihop**, the deficit is *not* a parsing artifact — those gaps
+  (and the residual overall gap, 50% vs monolithic's 56%) reflect the architecture
+  itself: verifier judgment errors and budget burn on revision loops the verifier
+  genuinely (if wrongly) requested.
+- Shadow's poor agentic code result (17%) is untouched by the counterfactual —
+  consistent with the earlier "verifier over-edits passing code" hypothesis
+  (`docs/SHADOW_TRIAL_LOG.md`), a different failure mode from false revision.
+
+### 8.5 Why this is a finding, not just a bug
 
 The failure is the *interaction* between (a) reasoning models' weak compliance with
 strict output protocols and (b) agent frameworks that key on exact tokens for
