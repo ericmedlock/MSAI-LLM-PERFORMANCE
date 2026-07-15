@@ -460,3 +460,26 @@ replication**: the study was paying 5× compute for a number that could not vary
 generalizes beyond this harness — *if your design pins determinism, N is a cost multiplier,
 not a statistic.* Determinism and replication are in direct tension; a design must choose
 which one N is for, and state it.
+
+### 9.7 Fix validated empirically (2026-07-15, M4 / Ollama / deepseek-r1:14b)
+
+First run under the amended config (`temperature 0.6`, `trials.seed_strategy: offset`),
+monolithic, N=5:
+
+| task | outcomes across the 5 trials | trial seeds | result |
+|---|---|---|---|
+| `fx2-hop-001` | True, **False**, True, **False**, True | 1042, 2042, 3042, 4042, 5042 | **3/5 — genuine split** |
+| `fx2-mathA-001` | True ×5 | 1042 … 5042 | 5/5 (a genuinely easy item) |
+
+**N now measures something.** Under the old config the split rate across two full N=5
+datasets was **2/70 (2.9%)** and **1/108 (0.9%)** — essentially all-or-nothing. Under the
+amended config a borderline item immediately produced a **3/5** split, i.e. the model's
+real output distribution, which is what the pre-registration assumes N is sampling.
+(A 5/5 item is not a failure of the fix: distinct seeds were used — see the seed column —
+the item is simply easy enough that every draw succeeds.)
+
+Also confirmed on the same rows: **GPU power telemetry is live on Apple M4**
+(`gpu_power_w: 12.5`, `avg_gpu_util_pct: 89.6`) using the *unmodified* reader written for
+the M5 — `powermetrics --samplers gpu_power` emits the same `GPU Power: N mW` format on
+both chips, so no chip-specific parser was needed; only the one-time sudoers grant
+(`scripts/setup_m5_power.sh`, which is misnamed — it is chip-agnostic).
