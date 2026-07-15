@@ -36,6 +36,10 @@ class _State(TypedDict):
     tokens_out: int
     actions: int
     trace: list[dict]
+    # Per-trial decoding seed (Amendment 2026-07-15). Carried in state because the
+    # graph is compiled once at construction but the seed varies per run/trial.
+    # None -> client's pinned seed.
+    seed: Optional[int]
 
 
 class AgenticBackend(Backend):
@@ -74,7 +78,7 @@ class AgenticBackend(Backend):
                 f"Verifier feedback: {state['feedback']}\n"
                 f"Provide a corrected final answer."
             )
-        resp = self._client.chat(self._executor_system, user)
+        resp = self._client.chat(self._executor_system, user, seed=state.get("seed"))
         return {
             "candidate": resp.text,
             "loop": state["loop"] + 1,
@@ -90,7 +94,7 @@ class AgenticBackend(Backend):
             f"Task:\n{state['question']}\n\n"
             f"Candidate answer:\n{state['candidate']}"
         )
-        resp = self._client.chat(self._verifier_system, user)
+        resp = self._client.chat(self._verifier_system, user, seed=state.get("seed"))
         approved = self._parse_verdict(resp.text)
         feedback = None if approved else resp.text.strip()
         return {
@@ -118,7 +122,7 @@ class AgenticBackend(Backend):
         return g.compile()
 
     # -- Backend API -------------------------------------------------------- #
-    def run(self, task: Task) -> BackendResult:
+    def run(self, task: Task, *, seed: Optional[int] = None) -> BackendResult:
         init: _State = {
             "question": task.prompt,
             "candidate": "",
@@ -129,6 +133,7 @@ class AgenticBackend(Backend):
             "tokens_out": 0,
             "actions": 0,
             "trace": [],
+            "seed": seed,
         }
         start = time.perf_counter()
         final = self._graph.invoke(init)

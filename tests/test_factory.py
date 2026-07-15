@@ -55,7 +55,7 @@ def test_build_client_selects_openai_for_lmstudio_local(config, monkeypatch):
     assert isinstance(client, OpenAICompatibleClient)
     assert client.base_url == "http://localhost:1234/v1"
     assert client.model_tag == "deepseek-r1-distill-qwen-14b"
-    assert client.temperature == 0.0                      # pinned, not overridable
+    assert client.temperature == 0.6                      # pinned (amended 2026-07-15), not overridable
     assert client.max_tokens == config.decoding.max_tokens
     assert client.seed == config.decoding.seed
 

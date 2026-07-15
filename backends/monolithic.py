@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import time
+from typing import Optional
 
 from backends.base import Backend, BackendResult, Task
 from backends.llm_client import LLMClient
@@ -22,9 +23,9 @@ class MonolithicBackend(Backend):
         self._client = client
         self._system = prompts.monolithic_system
 
-    def run(self, task: Task) -> BackendResult:
+    def run(self, task: Task, *, seed: Optional[int] = None) -> BackendResult:
         start = time.perf_counter()
-        resp = self._client.chat(self._system, task.prompt)
+        resp = self._client.chat(self._system, task.prompt, seed=seed)
         latency = time.perf_counter() - start
         trace = [
             {"role": "system", "content": self._system},

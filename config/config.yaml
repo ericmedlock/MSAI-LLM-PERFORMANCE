@@ -22,16 +22,34 @@ model:
   # config_hash computed while this field was empty.
 
 decoding:
-  temperature: 0.0                 # pinned for determinism (see pre-reg S5 tension)
+  # Raised 0.0 -> 0.6 (Amendment Log 2026-07-15). At temperature 0.0 with a seed
+  # held constant across trials, every one of the N trials executed the SAME
+  # deterministic computation: ~98% of N=5 cells returned identical verdicts on
+  # all five trials, so N measured floating-point jitter, not model variance
+  # (engineering log §9). 0.6 is DeepSeek-R1's documented operating point
+  # (model card recommends 0.5-0.7; temp 0 risks repetition/degradation for R1).
+  temperature: 0.6                 # sampling ON so N draws real samples (pre-reg S5)
   num_ctx: 8192                    # fixed context window
   max_tokens: 6144                 # fixed max output tokens; raised from 2048 —
                                    # DeepSeek-R1's chain-of-thought exhausted 2048
                                    # on code tasks before emitting any code (see
                                    # Amendment Log 2026-07-01). Held constant across cells.
-  seed: 42                         # fixed seed -> reproducible sampling
+  seed: 42                         # base seed -> reproducible (see trials.seed_strategy)
 
 trials:
   n: 5                             # runs per (task x architecture x environment)
+  # Per-TRIAL decoding seed (Amendment Log 2026-07-15). `offset` -> trial t draws
+  # with (seed + t * seed_stride), so each of the N trials is an independent draw.
+  # This is the trial-level analogue of architectures.swarm.peer_seed_strategy: the
+  # 2026-07-01 amendment fixed exactly this flaw for swarm PEERS ("a single shared
+  # seed at temperature 0.0 ... voids the independent-samples premise") but it was
+  # never applied to TRIALS — so N re-ran one computation N times (eng log §9).
+  # `same` -> all trials share the pinned seed (the old, deterministic behavior).
+  seed_strategy: offset            # offset | same
+  # Stride between trial seeds. MUST exceed architectures.swarm.num_agents, or a
+  # trial's peer seeds would collide with the next trial's (peer_seed = trial_seed
+  # + peer_index), silently correlating trials — the flaw we are removing.
+  seed_stride: 1000
 
 architectures:
   agentic:

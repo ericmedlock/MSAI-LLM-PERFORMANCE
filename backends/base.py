@@ -63,8 +63,15 @@ class Backend(ABC):
     name: str = "base"
 
     @abstractmethod
-    def run(self, task: Task) -> BackendResult:
-        """Execute ``task`` and return a uniform :class:`BackendResult`."""
+    def run(self, task: Task, *, seed: Optional[int] = None) -> BackendResult:
+        """Execute ``task`` and return a uniform :class:`BackendResult`.
+
+        ``seed`` overrides the client's pinned decoding seed for this run. The
+        runner passes a per-trial seed (``trials.seed_strategy: offset``) so each
+        of the N trials is an independent draw rather than a repeat of the same
+        deterministic computation (Amendment 2026-07-15, engineering log §9).
+        ``None`` = use the pinned seed (the pre-amendment behavior).
+        """
         raise NotImplementedError
 
     def health_check(self) -> bool:  # pragma: no cover - trivial default

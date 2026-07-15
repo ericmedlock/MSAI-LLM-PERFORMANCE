@@ -27,7 +27,7 @@ import json
 import operator
 import time
 from collections import Counter
-from typing import Annotated, TypedDict
+from typing import Annotated, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -49,6 +49,10 @@ class _State(TypedDict):
     question: str
     domain: str
     peers: Annotated[list[_PeerOut], operator.add]
+    # Per-trial base seed (Amendment 2026-07-15). Peers derive from THIS, not the
+    # construction-time base, so each trial's peers are an independent draw. The
+    # graph is compiled once, so it must travel in state. None -> pinned base.
+    base_seed: Optional[int]
 
 
 class SwarmBackend(Backend):
@@ -78,10 +82,11 @@ class SwarmBackend(Backend):
         self._vote_key = vote_key_ast if vote_mode == "ast" else vote_key
         self._graph = self._build_graph()
 
-    def _peer_seed(self, index: int) -> int:
+    def _peer_seed(self, index: int, base: Optional[int] = None) -> int:
+        base = self._base_seed if base is None else base
         if self._peer_seed_strategy == "same":
-            return self._base_seed
-        return self._base_seed + index
+            return base
+        return base + index
 
     def _make_peer_node(self, index: int):
         async def peer(state: _State) -> dict:
@@ -90,7 +95,7 @@ class SwarmBackend(Backend):
                 lambda: self._client.chat(
                     self._peer_system,
                     state["question"],
-                    seed=self._peer_seed(index),
+                    seed=self._peer_seed(index, state.get("base_seed")),
                     temperature=self._peer_temperature,
                 )
             )
@@ -155,8 +160,13 @@ class SwarmBackend(Backend):
             "peer_temp": self._peer_temperature,
         }
 
-    def run(self, task: Task) -> BackendResult:
-        init: _State = {"question": task.prompt, "domain": task.domain, "peers": []}
+    def run(self, task: Task, *, seed: Optional[int] = None) -> BackendResult:
+        init: _State = {
+            "question": task.prompt,
+            "domain": task.domain,
+            "peers": [],
+            "base_seed": seed,
+        }
         start = time.perf_counter()
         final = asyncio.run(self._graph.ainvoke(init))
         wall = time.perf_counter() - start

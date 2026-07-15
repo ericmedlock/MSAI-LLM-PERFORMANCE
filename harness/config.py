@@ -16,7 +16,7 @@ import hashlib
 import os
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 
@@ -139,6 +139,23 @@ class Config:
     prompts_dir: str
     results_dir: str
     config_hash: str
+    # Per-trial seed policy (Amendment 2026-07-15). Defaults reproduce the old
+    # pinned behavior for any config predating the amendment.
+    trial_seed_strategy: str = "same"   # "offset" -> seed + trial*stride | "same"
+    trial_seed_stride: int = 1000
+
+    def trial_seed(self, trial_idx: int) -> Optional[int]:
+        """Decoding seed for trial ``trial_idx`` (1-based), or None to use the
+        client's pinned seed.
+
+        ``offset`` gives every trial an independent draw — the trial-level
+        analogue of ``swarm.peer_seed_strategy``. The stride keeps a trial's
+        peer seeds (trial_seed + peer_index) from colliding with the next
+        trial's, which would silently correlate trials.
+        """
+        if self.trial_seed_strategy != "offset":
+            return None
+        return self.decoding.seed + trial_idx * self.trial_seed_stride
 
     def env(self, key: str | None = None) -> EnvironmentConfig:
         """Resolve the active environment (or an explicit override)."""
@@ -235,6 +252,8 @@ def load_config(path: str | Path) -> Config:
         ),
         environments=environments,
         trials_n=int(_require(data, "trials", "n")),
+        trial_seed_strategy=data.get("trials", {}).get("seed_strategy", "same"),
+        trial_seed_stride=int(data.get("trials", {}).get("seed_stride", 1000)),
         tasks_manifest=_require(data, "tasks_manifest"),
         prompts_dir=_require(data, "prompts_dir"),
         results_dir=_require(data, "results_dir"),

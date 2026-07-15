@@ -104,3 +104,27 @@ def test_backend_exception_is_recorded_not_fatal(config, prompts, tmp_path):
     assert row["correct"] is False
     assert row["error_category"] == "backend_exception"
     assert "model down" in row["metadata"]["exception"]
+
+
+def test_each_trial_draws_a_distinct_seed(config, prompts, tmp_path):
+    # Amendment 2026-07-15 / engineering log §9. Before the fix the runner used
+    # trial_idx only for the resume key, so all N trials ran the SAME
+    # deterministic call and N measured nothing. Prove the wiring end-to-end:
+    # the seed must actually reach the client, and differ per trial.
+    seen: list = []
+    runner = _runner(config, prompts, lambda s, u, seed: (seen.append(seed) or "72"))
+    runner.run_plan(RunPlan("local", ["monolithic"], TASKS[:1], trials=3), tmp_path / "o.jsonl")
+
+    assert len(seen) == 3
+    assert len(set(seen)) == 3, f"trials shared a seed -> not independent draws: {seen}"
+    assert seen == [config.trial_seed(t) for t in (1, 2, 3)]
+
+
+def test_trial_seed_is_stamped_on_every_row(config, prompts, tmp_path):
+    # A row must be self-describing: which seed produced it, under which policy.
+    out = tmp_path / "o.jsonl"
+    runner = _runner(config, prompts, lambda s, u, seed: "72")
+    runner.run_plan(RunPlan("local", ["monolithic"], TASKS[:1], trials=2), out)
+    rows = [json.loads(l) for l in out.read_text().splitlines()]
+    assert [r["metadata"]["trial_seed"] for r in rows] == [config.trial_seed(1), config.trial_seed(2)]
+    assert all(r["metadata"]["trial_seed_strategy"] == "offset" for r in rows)

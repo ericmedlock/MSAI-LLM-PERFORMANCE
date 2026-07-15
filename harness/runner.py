@@ -135,8 +135,11 @@ class Runner:
         collector = self._collector_factory(env.runtime)
         collector.start()
         error_category: Optional[str] = None
+        # Per-trial decoding seed (Amendment 2026-07-15): each trial is an
+        # independent draw. None -> client's pinned seed (pre-amendment behavior).
+        trial_seed = self._config.trial_seed(trial_idx)
         try:
-            result = backend.run(task)
+            result = backend.run(task, seed=trial_seed)
             answer = result.answer
             latency_s = result.latency_s
             tokens_in, tokens_out = result.tokens_in, result.tokens_out
@@ -151,6 +154,15 @@ class Runner:
             raw_trace = ""
             error_category = "backend_exception"
         telemetry = collector.stop()
+
+        # Stamp the draw so a row is self-describing: which seed produced it and
+        # under which trial-seed policy (config_hash also pins this, but the seed
+        # makes per-trial independence auditable from the row alone).
+        metadata = {
+            **metadata,
+            "trial_seed": trial_seed,
+            "trial_seed_strategy": self._config.trial_seed_strategy,
+        }
 
         if error_category is None:
             correct, error_category = grade(task, answer)
