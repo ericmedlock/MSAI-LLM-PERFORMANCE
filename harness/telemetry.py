@@ -170,11 +170,14 @@ class _PowermetricsReader:
         self._proc = None
         if os.uname().sysname != "Darwin":  # pragma: no cover - platform gate
             return
+        # Probe the specific grant (sudoers rule covers ONLY powermetrics,
+        # so `sudo -n true` would wrongly report unavailable).
         probe = subprocess.run(
-            ["sudo", "-n", "true"], capture_output=True, timeout=5
+            ["sudo", "-n", "-l", "/usr/bin/powermetrics"],
+            capture_output=True, timeout=5,
         )
         if probe.returncode != 0:
-            return  # no passwordless sudo -> degrade silently
+            return  # powermetrics not passwordless -> degrade silently
         self._proc = subprocess.Popen(
             [
                 "sudo", "-n", "/usr/bin/powermetrics",
