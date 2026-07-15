@@ -483,3 +483,130 @@ Also confirmed on the same rows: **GPU power telemetry is live on Apple M4**
 the M5 — `powermetrics --samplers gpu_power` emits the same `GPU Power: N mW` format on
 both chips, so no chip-specific parser was needed; only the one-time sudoers grant
 (`scripts/setup_m5_power.sh`, which is misnamed — it is chip-agnostic).
+
+## 10. Apple Silicon GPU power capture — implementation notes (2026-07-15)
+
+**Motivation:** advisor request (2026-07-14 call) — compare GPU power draw between the
+HPC NVIDIA cells and the M5. HPC rows already carried per-row `telemetry.gpu_power_w`
+via NVML; Metal rows had the field pinned to `None` (the documented asymmetry in
+`harness/telemetry.py`). Commits `4ba2826` (feature) and `c35bb65` (probe fix).
+
+### 10.1 Design
+
+- **One long-lived `sudo powermetrics --samplers gpu_power -i 1000` process per harness
+  process** (`_PowermetricsReader`, a module-level singleton). powermetrics has ~1 s
+  startup and needs sudo; restarting it per row would distort short rows. A daemon
+  thread parses the stream and holds the latest `GPU Power` / `GPU HW active residency`
+  values; each row's `MetalCollector` polls those at the normal 0.1 s telemetry cadence —
+  the same instantaneous-poll model as NVML on CUDA, so the row-level `gpu_power_w`
+  aggregation is identical across platforms.
+- **Privilege scoping:** the sudoers drop-in (`scripts/setup_m5_power.sh`) grants
+  NOPASSWD for `/usr/bin/powermetrics` only — read-only Apple system profiling, nothing
+  else. The file is validated with `visudo -cf` before it can take effect.
+- **Degradation guarantee:** without the grant (or off-macOS) the reader reports
+  unavailable and Metal rows keep the pre-existing `None` fields — no behavior change,
+  no password prompt mid-run. Verified live both ways.
+- Metal caveats stamped in code and docs: `avg_gpu_util_pct` on Metal is *HW active
+  residency* (not the NVML utilization counter); `peak_vram_mb` stays `None` on unified
+  memory (`peak_sys_used_mb` remains the footprint proxy).
+
+### 10.2 Bug found during rollout: probe the grant, not blanket sudo
+
+First availability probe was `sudo -n true` — which fails under a correctly-scoped
+sudoers rule (only powermetrics is granted), so the reader reported unavailable even
+though `sudo -n powermetrics` worked. **Fix:** probe `sudo -n -l /usr/bin/powermetrics`
+(ask about the specific grant). Lesson: least-privilege sudo rules break naive
+`sudo -n true` capability probes; always probe the command you intend to run.
+
+### 10.3 Verification
+
+- Unit: parser tests on canned powermetrics output; fake-reader tests for both the
+  capture and degradation paths (no sudo in CI). 147 offline tests pass.
+- Live (M5, first sweep row): `fx2-mathA-001` monolithic, 41 s → `gpu_power_w: 45.8`,
+  `avg_gpu_util_pct: 94.1`, 402 samples. Idle floor reads ~0.03 W — sanity-consistent.
+- Portability: ran unmodified on M4 (§9.7).
+
+## 11. Energy economics — first cross-platform results (2026-07-15)
+
+**Cell:** `results/frontier-v2.1-local-power-14b-n1.jsonl` — 36 tasks × 3 architectures
+× N=1 = 108 rows on the M5 Max, **deliberately run under the pre-amendment pinned config
+(temp 0, hash `e33a15cdfd8a0c35`) so it joins cleanly against the HPC/Shadow cells of the
+same epoch** (§11.4). Survived a mid-run machine crash at row 48; row-level resume
+completed it — no gaps, no dupes, 108/108 power coverage. N=1 accuracy replicated the
+N=5 cells almost exactly (58/47/61% vs 56/47/61% mono/agentic/swarm) — expected under
+§9's determinism, and evidence the energy cell is representative.
+
+### 11.1 Platform efficiency (GPU-subsystem power × row latency)
+
+| platform | mean tok/s | mean GPU W | tokens/joule |
+|---|---|---|---|
+| M5 Max, Metal (108 rows) | 37–41 | **24–26** | **1.55–1.76** |
+| RTX A4500, Shadow (108 rows) | 37.7 | 188 | 0.21 |
+| A40, HPC (540 rows) | 17.5 | 139–149 | 0.12 |
+
+The clean comparison is **M5 vs A4500: identical decode speed (~37–38 tok/s) at ~7.5×
+less power → ~8× tokens/joule**. Same speed, one-eighth the energy. Against the
+as-deployed A40, ~14×.
+
+### 11.2 Energy per correct answer — the architecture × platform interaction
+
+| kJ per correct answer | monolithic | agentic | swarm |
+|---|---|---|---|
+| M5 Max | **2.8** | 6.3 | 7.6 |
+| A40 (HPC) | 42 | 79 | **39** |
+
+Two findings:
+
+1. **M5 beats the A40 5–15× on energy per correct answer**, architecture depending.
+2. **The energy-optimal architecture flips by platform.** On the M5, monolithic wins
+   decisively; on the A40 deployment, swarm won. The bottlenecked A40 (§11.3) penalized
+   monolithic disproportionately, inverting the ranking. Energy-optimal architecture is
+   a *deployment* property, not an intrinsic one. M5 GPU power is essentially flat
+   across architectures (24–26 W), so on a healthy platform token volume alone predicts
+   energy; on a bottlenecked one it does not.
+
+### 11.3 The A40 anomaly
+
+The A40 runs at **half the throughput of the much weaker A4500** (17.5 vs 37.7 tok/s)
+while reporting 83% GPU utilization. The datacenter deployment is bottlenecked
+somewhere off-GPU — candidates: CPU-side orchestration, the serving build, node
+contention. Connects to the advisor's point that agentic-era workloads may bottleneck
+on CPU, and to the §3/§9.4 theme that the serving stack is part of the experiment.
+Open item: profile the Starlight deployment before attributing anything to the silicon.
+
+### 11.4 Caveats and epoch bookkeeping
+
+- powermetrics reports the **Apple GPU rail**; NVML reports **board power** — scopes
+  differ. Present as "GPU-subsystem power as deployed," not silicon perf/W. Whole-system
+  energy + datacenter PUE would *widen* the gap in the M5's favor (stated numbers are
+  conservative). The A40 figure is as-deployed, not best-case CUDA.
+- **Config epochs (from §9's amendment):** every cell through 2026-07-15 — including
+  this power sweep — is the deterministic-N epoch (`e33a15cdfd8a0c35`, temp 0). The
+  amendment (temp 0.6 + per-trial seed offsets) starts a new hash. Cross-epoch numbers
+  must not be mixed unflagged; the power sweep was intentionally kept in the old epoch
+  because the cells it joins against (HPC, Shadow) live there.
+- Full claim/evidence framing for the paper: vault note *Paper-Worthy Findings —
+  2026-07 Campaign*, F10.
+
+## 12. Same-day secondary analyses (2026-07-15) — pointers
+
+Recorded in `results/POST_RUN_NOTE_2026-07-15_provenance_and_taxonomy.md` and the vault
+run log; summarized here so the log stays the single chronicle:
+
+- **Swarm 2.0 cell** (peer temp 0.7, N=5, 180 rows): 57.8% < swarm 1.0's 61.1%; 116/180
+  ties → tie-break degenerates to peer 0. With the k-voter simulation (5–7 voters buy
+  <1 pt) and the vote-mechanism counterfactual (`scripts/swarm_vote_counterfactual.py`,
+  replay fidelity 180/180: AST keys merge **0/55** code ties — peer programs are
+  structurally different, similarity ≈0.38; refusal-abstain +0.5 pt), every cheap vote
+  upgrade is exhausted: **the swarm win is a prompt/determinism effect, not an ensemble
+  effect, at 14B.** Note §9's amendment partially supersedes the 1.0-vs-2.0 distinction:
+  at baseline temp 0.6, peers sample by default.
+- **Grader taxonomy fix** (`harness/graders.py`): SyntaxError/IndentationError →
+  `format_error` (was `tool_error`); category-only, no accuracy change. Restores
+  cross-environment comparability of error categories (fx21-code-005 was `tool_error`×5
+  local vs `reasoning_error`×5 HPC — the local "code" was thinking-fallback CoT prose).
+- **Provenance:** 10 strict-agentic rows in the local N=5 cell predate the 2026-07-12
+  client fix (empty answers impossible post-fix) — footnoted, not re-run; the agentic
+  2.0 cell supersedes them. `fx2-mathA-009` confirmed floored everywhere (0/5 all
+  backends/platforms, 495–741 s/row) — kept (pre-registered), flagged in the
+  floored-item set.
