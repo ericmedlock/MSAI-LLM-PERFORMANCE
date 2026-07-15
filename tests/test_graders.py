@@ -71,8 +71,15 @@ def test_humaneval_format_error_when_function_absent():
     assert ok is False and err == ERR_FORMAT
 
 
-def test_humaneval_tool_error_on_syntax_error():
+def test_humaneval_format_error_on_syntax_error():
+    # invalid Python (e.g. reasoning prose via the thinking-fallback) is a
+    # FORMAT failure of the answer, not a tool failure (taxonomy fix 2026-07-15)
     ok, err = grade_humaneval(_TASK_CODE, "```python\ndef add(x, y)\n    return x+y\n```")
+    assert ok is False and err == ERR_FORMAT
+
+
+def test_humaneval_tool_error_on_runtime_crash():
+    ok, err = grade_humaneval(_TASK_CODE, "```python\ndef add(x, y):\n    return undefined_name\n```")
     assert ok is False and err == ERR_TOOL
 
 

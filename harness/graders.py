@@ -121,9 +121,17 @@ def grade_humaneval(
             return False, ERR_TIMEOUT
     if proc.returncode == 0:
         return True, None
-    # AssertionError => wrong logic; anything else => it did not even run.
+    # AssertionError => wrong logic. SyntaxError/IndentationError => the
+    # answer was not valid Python at all (e.g. reasoning prose returned via
+    # the thinking-fallback on budget exhaustion) — that is a FORMAT failure
+    # of the answer, not a tool failure. Anything else => it did not even run.
+    # Category-only distinction: `correct` is False on every path.
     stderr = proc.stderr or ""
-    return False, (ERR_REASONING if "AssertionError" in stderr else ERR_TOOL)
+    if "AssertionError" in stderr:
+        return False, ERR_REASONING
+    if "SyntaxError" in stderr or "IndentationError" in stderr:
+        return False, ERR_FORMAT
+    return False, ERR_TOOL
 
 
 _GRADERS = {
