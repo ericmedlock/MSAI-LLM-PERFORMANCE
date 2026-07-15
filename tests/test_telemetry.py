@@ -30,13 +30,52 @@ def test_sampling_collector_reports_portable_fields():
     assert result["samples"] >= 0
 
 
-def test_metal_leaves_gpu_power_none_by_design():
+class _FakeReader:
+    """Stand-in for _PowermetricsReader: no subprocess, no sudo."""
+
+    def __init__(self, available, power=None, util=None):
+        self.available = available
+        self.latest_power_w = power
+        self.latest_util_pct = util
+
+
+def test_metal_degrades_to_none_without_powermetrics(monkeypatch):
+    monkeypatch.setattr(
+        telemetry._PowermetricsReader, "shared", classmethod(lambda cls: _FakeReader(False))
+    )
     c = MetalCollector(interval_s=0.01)
     c.start()
     result = c.stop()
     assert result["runtime"] == "metal"
-    assert result["gpu_power_w"] is None      # requires sudo powermetrics; omitted
+    assert result["gpu_power_w"] is None      # no passwordless sudo -> pre-2026-07-15 shape
+    assert result["avg_gpu_util_pct"] is None
     assert result["peak_vram_mb"] is None
+
+
+def test_metal_samples_power_via_powermetrics(monkeypatch):
+    monkeypatch.setattr(
+        telemetry._PowermetricsReader,
+        "shared",
+        classmethod(lambda cls: _FakeReader(True, power=12.3, util=45.0)),
+    )
+    c = MetalCollector(interval_s=0.01)
+    c.start()
+    sum(range(100_000))
+    result = c.stop()
+    assert result["gpu_power_w"] == 12.3
+    assert result["avg_gpu_util_pct"] == 45.0
+    assert result["peak_vram_mb"] is None     # unified memory: stays None by design
+
+
+def test_powermetrics_line_parsing():
+    r = object.__new__(telemetry._PowermetricsReader)  # skip __init__: no subprocess
+    r.latest_power_w = None
+    r.latest_util_pct = None
+    r.parse_line("GPU Power: 12345 mW\n")
+    r.parse_line("GPU HW active residency:  45.20% (389 MHz: 22% 486 MHz: 11% ...)\n")
+    r.parse_line("CPU Power: 999 mW\n")       # must not clobber GPU power
+    assert r.latest_power_w == 12.345
+    assert r.latest_util_pct == 45.20
 
 
 def test_noop_collector_records_nothing():

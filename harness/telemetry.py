@@ -7,16 +7,22 @@ figures on the telemetry row.
 Cross-environment reality (pre-reg S12, Metal-vs-CUDA threat):
 - CPU% and system RAM are portable (psutil) on both Metal and CUDA.
 - GPU VRAM / util / power are available on CUDA via NVML (``pynvml``).
-- On Apple Silicon (Metal) there is **no** ``nvidia-smi``/NVML. GPU power
-  needs ``sudo powermetrics`` and is intentionally left out of the harness;
-  those fields are ``None`` on Metal and this asymmetry is a documented
-  limitation, not a bug. On unified memory the model still shows up in
-  system RAM, so ``peak_ram_mb`` remains a meaningful footprint proxy.
+- On Apple Silicon (Metal) GPU power/util come from ``sudo powermetrics``
+  (added 2026-07-15, advisor request: HPC-vs-M5 energy comparison). This
+  requires passwordless sudo for /usr/bin/powermetrics — run
+  ``scripts/setup_m5_power.sh`` once to install the sudoers drop-in.
+  Without it the fields degrade to ``None`` exactly as before (documented
+  asymmetry, not an error). ``avg_gpu_util_pct`` on Metal is the "GPU HW
+  active residency" — a residency proxy, not the same counter NVML reports.
+  On unified memory there is no discrete VRAM; ``peak_vram_mb`` stays None
+  and ``peak_sys_used_mb`` remains the footprint proxy.
 """
 
 from __future__ import annotations
 
 import os
+import re
+import subprocess
 import threading
 import time
 from typing import Optional, Protocol
@@ -139,13 +145,99 @@ class _SamplingCollector:
         return result
 
 
+_PM_POWER = re.compile(r"GPU Power:\s*(\d+(?:\.\d+)?)\s*mW")
+_PM_RESIDENCY = re.compile(r"GPU HW active residency:\s*(\d+(?:\.\d+)?)\s*%")
+
+
+class _PowermetricsReader:
+    """Shared background reader for ``sudo powermetrics`` on Apple Silicon.
+
+    One long-lived subprocess per harness process (powermetrics has ~1 s
+    startup and needs sudo; restarting it per row would distort short rows).
+    A daemon thread parses the stream and keeps the latest GPU power /
+    residency values; collectors poll those like NVML instantaneous reads.
+    Unavailable (no sudo -n, not darwin, spawn failure) -> ``available`` is
+    False and Metal rows keep the pre-2026-07-15 ``None`` fields.
+    """
+
+    _instance: Optional["_PowermetricsReader"] = None
+    _lock = threading.Lock()
+
+    def __init__(self, interval_ms: int = 1000) -> None:
+        self.available = False
+        self.latest_power_w: Optional[float] = None
+        self.latest_util_pct: Optional[float] = None
+        self._proc = None
+        if os.uname().sysname != "Darwin":  # pragma: no cover - platform gate
+            return
+        probe = subprocess.run(
+            ["sudo", "-n", "true"], capture_output=True, timeout=5
+        )
+        if probe.returncode != 0:
+            return  # no passwordless sudo -> degrade silently
+        self._proc = subprocess.Popen(
+            [
+                "sudo", "-n", "/usr/bin/powermetrics",
+                "--samplers", "gpu_power",
+                "-i", str(interval_ms),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        threading.Thread(target=self._read, daemon=True).start()
+        self.available = True
+
+    def _read(self) -> None:
+        assert self._proc is not None and self._proc.stdout is not None
+        for line in self._proc.stdout:
+            self.parse_line(line)
+
+    def parse_line(self, line: str) -> None:
+        m = _PM_POWER.search(line)
+        if m:
+            self.latest_power_w = float(m.group(1)) / 1000.0
+            return
+        m = _PM_RESIDENCY.search(line)
+        if m:
+            self.latest_util_pct = float(m.group(1))
+
+    @classmethod
+    def shared(cls) -> "_PowermetricsReader":
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
+
 class MetalCollector(_SamplingCollector):
-    """Apple Silicon. GPU power/util require sudo and are left as None."""
+    """Apple Silicon. GPU power/util via the shared powermetrics reader
+    when passwordless sudo is configured (scripts/setup_m5_power.sh);
+    otherwise those fields are None."""
 
     runtime = "metal"
 
+    def _extra_start(self) -> None:
+        self._gpu_util: list[float] = []
+        self._gpu_power: list[float] = []
+        self._reader = _PowermetricsReader.shared()
+
+    def _extra_sample(self) -> None:
+        if not self._reader.available:
+            return
+        if self._reader.latest_power_w is not None:
+            self._gpu_power.append(self._reader.latest_power_w)
+        if self._reader.latest_util_pct is not None:
+            self._gpu_util.append(self._reader.latest_util_pct)
+
     def _extra_result(self) -> dict:
-        return {"peak_vram_mb": None, "avg_gpu_util_pct": None, "gpu_power_w": None}
+        avg_util = sum(self._gpu_util) / len(self._gpu_util) if self._gpu_util else None
+        avg_power = sum(self._gpu_power) / len(self._gpu_power) if self._gpu_power else None
+        return {
+            "peak_vram_mb": None,  # unified memory: peak_sys_used_mb is the proxy
+            "avg_gpu_util_pct": round(avg_util, 1) if avg_util is not None else None,
+            "gpu_power_w": round(avg_power, 1) if avg_power is not None else None,
+        }
 
 
 class CudaCollector(_SamplingCollector):
