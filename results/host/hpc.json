@@ -18,7 +18,7 @@
   },
   "serving": {
     "provider": "ollama",
-    "base_url": "http://127.0.0.1:32452",
+    "base_url": "http://127.0.0.1:37093",
     "backend_model": "deepseek-r1:14b",
     "judge_model": "llama-3.2-3b-instruct",
     "models_available": [
@@ -26,5 +26,5 @@
     ]
   },
   "config_hash": "e33a15cdfd8a0c35",
-  "captured_at": "2026-07-13T23:58:00.868998+00:00"
+  "captured_at": "2026-07-14T22:49:57.739892+00:00"
 }

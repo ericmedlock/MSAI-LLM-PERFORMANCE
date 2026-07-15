@@ -1,4 +1,5 @@
 host_id,hostname,environment,runtime,chip,machine_model,cpu_cores,total_ram_gb,gpu_model,gpu_cores,total_vram_gb,unified_memory,os,python,provider,base_url,backend_model,judge_model,config_hash
-857f2acf7c18,str-gpu16.charlotte.edu,hpc,cuda,x86_64,,32,250,NVIDIA A40,,45,False,Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34,3.12.3,ollama,http://127.0.0.1:32452,deepseek-r1:14b,llama-3.2-3b-instruct,e33a15cdfd8a0c35
+857f2acf7c18,str-gpu16.charlotte.edu,hpc,cuda,x86_64,,32,250,NVIDIA A40,,45,False,Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34,3.12.3,ollama,http://127.0.0.1:37093,deepseek-r1:14b,llama-3.2-3b-instruct,e33a15cdfd8a0c35
+ccb3fbe43385,str-gpu15.charlotte.edu,hpc,cuda,x86_64,,32,250,NVIDIA A40,,45,False,Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34,3.12.3,ollama,http://127.0.0.1:37094,deepseek-r1:14b,llama-3.2-3b-instruct,e33a15cdfd8a0c35
 1206196e7f11,Mac,local,metal,Apple M5 Max,"Mac17,6",18,48,Apple M5 Max,40,48,True,macOS-26.5.2-arm64-arm-64bit-Mach-O,3.13.11,ollama,http://localhost:11434,deepseek-r1:14b,llama-3.2-3b-instruct,e33a15cdfd8a0c35
 752b2eccda28,Erics-MacBook.local,local,metal,Apple M5 Max,"Mac17,6",18,48,Apple M5 Max,40,48,True,macOS-26.5.2-arm64-arm-64bit-Mach-O,3.13.11,ollama,http://localhost:11434,deepseek-r1:14b,llama-3.2-3b-instruct,e33a15cdfd8a0c35
