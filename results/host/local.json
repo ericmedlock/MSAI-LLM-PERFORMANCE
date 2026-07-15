@@ -1,6 +1,6 @@
 {
-  "host_id": "1206196e7f11",
-  "hostname": "Mac",
+  "host_id": "752b2eccda28",
+  "hostname": "Erics-MacBook.local",
   "environment": "local",
   "runtime": "metal",
   "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
@@ -26,5 +26,5 @@
     ]
   },
   "config_hash": "e33a15cdfd8a0c35",
-  "captured_at": "2026-07-14T19:26:16.794564+00:00"
+  "captured_at": "2026-07-14T23:53:22.628981+00:00"
 }
