@@ -5,7 +5,7 @@ validation trials performed while building the harness and running the
 multi-machine study. Written for inclusion in the final report. Companion to
 `PRE_REGISTRATION.md` (frozen design) and `docs/TASK_TIERS.md`.
 
-Last updated: 2026-07-14.
+Last updated: 2026-07-15.
 
 ---
 
@@ -376,3 +376,87 @@ through the model's prose, and that channel is exactly what a reasoning model's
 style (and the thinking-field failure mode) corrupts. For the paper: part of
 "agentic underperforms" decomposes into *verifier judgment cost* vs
 *protocol-compliance loss* — the counterfactual separates the two.
+
+---
+
+## 9. The N-trials flaw: N=5 measured (almost) nothing
+
+**Status: FLAW CONFIRMED — pinned design change + full data regeneration (2026-07-15).**
+This is the reason the study changed approach and regenerated all trial data.
+
+### 9.1 Symptom
+
+N=5 runs cost 5× the compute, but ~98% of cells returned the **identical verdict on
+all five trials**:
+
+| N=5 dataset | multi-trial cells | per-cell outcome spread | cells with *any* variance |
+|---|---|---|---|
+| `results/frontier-v2-calib-14b.jsonl` | 70 | 0/5 ×21 · **1/5 ×1** · **4/5 ×1** · 5/5 ×47 | **2/70 = 2.9%** |
+| `results/frontier-v2.1-local-ollama-14b-n5.jsonl` | 108 | 0/5 ×48 · **1/5 ×1** · 5/5 ×59 | **1/108 = 0.9%** |
+
+All-or-nothing (0/5 or 5/5) is the signature of a deterministic computation repeated
+N times — not of sampling.
+
+### 9.2 Root cause — two pinned values conspire
+
+- **`decoding.temperature: 0.0`** → greedy decoding: no sampling, one canonical output.
+- **`decoding.seed: 42`**, and **`trial_idx` never reaches the seed.** In `harness/runner.py`
+  the trial index is used only for the resume key and the row label; it is never passed to
+  the client or backend. Every trial therefore executes the *same* deterministic call.
+
+So **N was not drawing samples from the model's output distribution — it re-ran one
+computation N times.** The residual ~1–3% of split cells is *hardware* nondeterminism
+(GPU scheduling, non-associative floating-point reduction) occasionally flipping a token
+early in the reasoning chain — not model variance.
+
+### 9.3 Why this voids the premise — and the precedent we missed
+
+Pre-registration **S2** rests on the swarm aggregating **independent samples**. The
+Amendment Log entry of **2026-07-01** already diagnosed this exact failure *at the peer
+level*:
+
+> "Under the pinned temperature 0.0, a single shared seed makes all three peers
+> deterministically identical, collapsing the vote and voiding the 'independent samples'
+> premise the hypothesis rests on."
+
+and fixed it with `swarm.peer_seed_strategy: offset` (peer *i* draws with `seed + i`).
+**The identical reasoning applies across trials — and was never applied.** N=5 over trials
+is the same violation the swarm fix repaired over peers. That amendment even anticipated
+the alternative now adopted: *"revisit if the advisor prefers temp>0 with a shared seed as
+the diversity source instead."*
+
+### 9.4 Consequence for existing data
+
+- Every **N>1** run to date (calibrations, Shadow, M5 Max, HPC) contains N-fold *duplicated*
+  trials, not independent samples. Any variance, error bar, or CI derived from them is
+  invalid — it quantifies floating-point jitter, not model variability.
+- Point estimates are **not** wrong, merely N-fold redundant: **N=1 carries ~97–99% of the
+  information of N=5 at 1/5 the compute.** (This is why the M4 cells were run at N=1 with
+  no measurable loss, and why the ~5-day M4 N=5 job would have spent ~4 days re-confirming
+  trial 1.)
+- It also explains a previously puzzling asymmetry: **within** a box, N=5 is flat
+  (deterministic), while **across** boxes N=1 diverges (M4 50% vs Shadow 25% on math) —
+  different accelerators take different floating-point paths, same-box reruns do not.
+
+### 9.5 The fix
+
+Both knobs are **pinned scientific parameters**, so this is a pre-registration amendment,
+not a code tweak — and it changes `config_hash`, which is the point: new data is explicitly
+marked as a different configuration rather than silently mixed with the old.
+
+1. **Per-trial seed offset** — `seed = base_seed + trial_idx`, mirroring the existing peer
+   offset, so each trial is a distinct draw.
+2. **Temperature > 0** — restores genuine sampling so N measures the model's actual output
+   variability (the thing the pre-registration assumes N is measuring).
+
+**All trial data is regenerated under the amended config.** Prior runs are retained as the
+deterministic-N archive/baseline — they remain valid as *point estimates*, and are the
+evidence for this section.
+
+### 9.6 Methodological takeaway (for the paper)
+
+A pinned "reproducibility" setting (temp 0 + fixed seed) silently **defeated the purpose of
+replication**: the study was paying 5× compute for a number that could not vary. The lesson
+generalizes beyond this harness — *if your design pins determinism, N is a cost multiplier,
+not a statistic.* Determinism and replication are in direct tension; a design must choose
+which one N is for, and state it.
