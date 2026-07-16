@@ -610,3 +610,67 @@ run log; summarized here so the log stays the single chronicle:
   2.0 cell supersedes them. `fx2-mathA-009` confirmed floored everywhere (0/5 all
   backends/platforms, 495–741 s/row) — kept (pre-registered), flagged in the
   floored-item set.
+
+---
+
+## 10. First sampled dataset: M4 · frontier-v2.1 · monolithic · N=5
+
+The first cell run under the amended config (Amendment 2026-07-15: `temperature 0.6`
++ `trials.seed_strategy: offset`). **180/180 rows, 0 errors**, deepseek-r1:14b via Ollama
+on Apple M4 (Metal). This is the first dataset in the study whose N is a real statistic.
+
+### 10.1 Accuracy — with error bars that are now meaningful
+
+| domain | sampled (N=5) | temp-0 calibration | band [0.4, 0.7] | tasks with real variance |
+|---|---|---|---|---|
+| math (AIME) | **32% ± 12%** | 42% | ❌ **below** | 3/12 (25%) |
+| code (v2.1) | **48% ± 13%** | 58% | ✅ in | 2/12 (17%) |
+| multihop | **72% ± 11%** | 67% | ⚠️ slightly above | 5/12 (42%) |
+| **overall** | **91/180 = 51%** | 52% | ✅ | **10/36 = 28%** |
+
+**N now measures the model.** 10/36 tasks (28%) genuinely split across trials, versus
+**2/70 (2.9%)** and **1/108 (0.9%)** under the old config — a ~10–30× increase. The ± values
+above are the first legitimate confidence intervals in the study; under the pre-amendment
+design they would have been fabrications (N-fold copies of one deterministic computation).
+
+### 10.2 Sampling does not shift the domains uniformly
+
+The **aggregate is nearly unchanged** (51% sampled vs 52% calibrated) — but that stability
+hides opposite per-domain moves:
+
+- **math −10 pts** (42 → 32, now *below* band). Long arithmetic/proof chains are fragile to
+  temperature: one unlucky token derails the whole derivation, and there is no recovery path
+  in a single pass. Greedy decoding is close to optimal here.
+- **code −10 pts** (58 → 48) but still in band.
+- **multihop +5 pts** (67 → 72, now marginally *above* band). Short extractive answers are
+  robust to sampling; temperature appears to help slightly.
+
+**Consequence:** the v2.1 tier's calibration does **not** survive the amendment domain-by-
+domain. Math falls out of the band (toward "unreachable"), multihop drifts above it (toward
+"no headroom"). Only the aggregate looks fine — which is exactly the kind of averaging that
+§1 warns about. **The tier should be re-calibrated at temp 0.6** before it is used to claim
+where architectures win; this is an advisor-level decision (re-calibrating math likely means
+re-sourcing items, as v2.1 did for code).
+
+### 10.3 A methods caution recorded from this run
+
+Mid-run, partial-domain accuracy was badly misleading: code read **17% (n=11) → 24% (n=34) →
+48% (n=60)**. The runner is **task-major**, so a partially-completed domain is not a random
+sample of it — it is the *first tasks in manifest order*, and the early `fx21-code-*` items
+are the hard ones. An in-flight reading nearly produced a wrong conclusion ("sampling
+collapses code accuracy"). **Do not read a domain until its cells are complete**; the
+per-cell failure modes being genuine (`reasoning_error`, not `format_error`) is *not*
+sufficient to license a domain-level claim from a biased subset.
+
+### 10.4 Energy (Apple M4, Metal — first energy data in the study)
+
+| metric | value |
+|---|---|
+| GPU power | median **12.0 W**, mean 12.7 W (n = 180/180 rows) |
+| GPU utilisation | ~100% sustained |
+| model wall-clock | 13.0 h |
+| **approx GPU energy** | **~0.164 kWh** for 180 single-pass cells |
+
+Captured via `powermetrics` with the **unmodified** reader written for the M5 — the same
+`GPU Power: N mW` format is emitted on M4, so no chip-specific parser was needed (only the
+one-time sudoers grant; `scripts/setup_m5_power.sh` is misnamed — it is chip-agnostic).
