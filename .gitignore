@@ -195,3 +195,4 @@ output/
 # in-flight run output — untracked until the cell completes (2026-07-16 incident:
 # rebase checkout clobbered a live tracked output file; add with -f when done)
 results/frontier-v2.1-local-14b.jsonl
+logs/
