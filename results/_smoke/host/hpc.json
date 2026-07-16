@@ -1,0 +1,30 @@
+{
+  "host_id": "857f2acf7c18",
+  "hostname": "str-gpu16.charlotte.edu",
+  "environment": "hpc",
+  "runtime": "cuda",
+  "os": "Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34",
+  "python": "3.12.3",
+  "hardware": {
+    "chip": "x86_64",
+    "machine_model": null,
+    "cpu_cores": 32,
+    "total_ram_gb": 250,
+    "gpu_model": "NVIDIA A40",
+    "gpu_cores": null,
+    "total_vram_gb": 45,
+    "unified_memory": false,
+    "gpu_count": 1
+  },
+  "serving": {
+    "provider": "ollama",
+    "base_url": "http://127.0.0.1:38374",
+    "backend_model": "deepseek-r1:14b",
+    "judge_model": "llama-3.2-3b-instruct",
+    "models_available": [
+      "deepseek-r1:14b"
+    ]
+  },
+  "config_hash": "2bdbb6952605c7ca",
+  "captured_at": "2026-07-15T17:33:55.952700+00:00"
+}

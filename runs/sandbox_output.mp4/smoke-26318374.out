@@ -1,0 +1,63 @@
+== node=str-gpu16.charlotte.edu job=26318374
+GPU 0: NVIDIA A40 (UUID: GPU-4c4e6551-8364-c244-03a9-d47a27700385)
+name, driver_version, clocks.max.sm [MHz], power.limit [W]
+NVIDIA A40, 570.195.03, 1740 MHz, 300.00 W
+== cpus available to this job: 8
+[setup] detected profile: hpc  (Linux, GPU: NVIDIA A40)
+[setup:offline] venv: OK
+[setup:offline] ollama binary: OK (/users/emedlock/.local/bin/ollama)
+[setup:offline] model cache (deepseek-r1:14b): OK
+[setup:offline] all artifacts present — ready to run
+== throughput probe (raw ollama, no harness)
+[bootstrap] model cache: /scratch/emedlock/ollama-models
+[bootstrap] starting ollama serve on 127.0.0.1:38374
+[bootstrap] deepseek-r1:14b already cached — skipping pull
+NVIDIA A40, 46068 MiB
+[bootstrap] ready: http://127.0.0.1:38374 serving deepseek-r1:14b (ollama 0.24.0)
+  num_predict=  64  eval   64 tok in   2.87s =  22.32 tok/s   prompt 14 tok in 0.08s   wall 35.81s
+  num_predict= 128  eval  128 tok in   5.80s =  22.08 tok/s   prompt 14 tok in 0.03s   wall 6.90s
+  num_predict= 512  eval  162 tok in   7.38s =  21.94 tok/s   prompt 14 tok in 0.03s   wall 8.62s
+  => sustained decode ~22.1 tok/s  (§11.3 baseline: A40 17.5, A4500 ~35)
+== harness smoke rows
+[trials] verifying model is GPU-resident on http://127.0.0.1:38374
+[trials] deepseek-r1:14b: size=17.8GB vram=17.8GB
+[trials] profile=hpc env=hpc trials=2 manifest=tasks/frontier_v2_1_manifest.json -> results/_smoke/preflight.jsonl
+/users/emedlock/MSAI-LLM-PERFORMANCE/.venv/lib/python3.12/site-packages/langgraph/checkpoint/base/__init__.py:18: LangChainPendingDeprecationWarning: The default value of `allowed_objects` will change in a future version. Pass an explicit value (e.g., allowed_objects='messages' or allowed_objects='core') to suppress this warning.
+  from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+Environment : hpc (UNCC Research HPC (CUDA) — Ollama)
+Provider    : ollama @ http://127.0.0.1:38374
+Model       : deepseek-r1:14b  [canonical: deepseek-r1-14b-distill-q4_k_m Q4_K_M]
+Backends    : monolithic, agentic
+Tasks       : 1  (tier: frontier)
+Trials (N)  : 2
+Total cells : 4 runs -> results/_smoke/preflight.jsonl
+
+[dry-run] not calling the model.
+[trials] launching (resumable; Ctrl-C safe)
+/users/emedlock/MSAI-LLM-PERFORMANCE/.venv/lib/python3.12/site-packages/langgraph/checkpoint/base/__init__.py:18: LangChainPendingDeprecationWarning: The default value of `allowed_objects` will change in a future version. Pass an explicit value (e.g., allowed_objects='messages' or allowed_objects='core') to suppress this warning.
+  from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+Environment : hpc (UNCC Research HPC (CUDA) — Ollama)
+Provider    : ollama @ http://127.0.0.1:38374
+Model       : deepseek-r1:14b  [canonical: deepseek-r1-14b-distill-q4_k_m Q4_K_M]
+Backends    : monolithic, agentic
+Tasks       : 1  (tier: frontier)
+Trials (N)  : 2
+Total cells : 4 runs -> results/_smoke/preflight.jsonl
+
+Done. Wrote 4 new row(s); 0 already present.
+[trials] done; rows:
+4 results/_smoke/preflight.jsonl
+[trials] next: commit the results JSONL + results/host/hpc.json and push
+== VERIFY
+  [PASS] rows written got 4 (expect 2 backends x 2 trials)
+  [PASS] config_hash == 2bdbb6952605c7ca got {'2bdbb6952605c7ca'}
+  [PASS] config temperature == 0.6 got 0.6
+  [PASS] trial_seed_strategy == offset got offset
+  [PASS] monolithic: trial seeds distinct + non-null seeds=[1042, 2042]
+  [PASS] agentic: trial seeds distinct + non-null seeds=[1042, 2042]
+  [PASS] telemetry.gpu_power_w non-null on every row got [130.8, 139.5, 141.2, 142.3]
+  [PASS] telemetry.gpu_name stamped got {'NVIDIA A40'}
+  [PASS] agentic verdict_mode == lenient got {'lenient'}
+  [INFO] harness tokens_per_s: [17.8, 19.1, 19.1, 19.1] (old-epoch A40 rows ~18; §11.3 anomaly if still ~half an A4500)
+
+== SMOKE OK — safe to submit the 15-way array

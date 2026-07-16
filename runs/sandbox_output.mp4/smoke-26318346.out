@@ -1,0 +1,17 @@
+== node=str-gpu16.charlotte.edu job=26318346
+GPU 0: NVIDIA A40 (UUID: GPU-4c4e6551-8364-c244-03a9-d47a27700385)
+name, driver_version, clocks.max.sm [MHz], power.limit [W]
+NVIDIA A40, 570.195.03, 1740 MHz, 300.00 W
+== cpus available to this job: 8
+[setup] detected profile: hpc  (Linux, GPU: NVIDIA A40)
+[setup] OLLAMA_MODELS defaulted to /scratch/emedlock/ollama-models (home dir is quota'd)
+[setup:offline] venv: OK
+[setup:offline] ollama binary: OK (/users/emedlock/.local/bin/ollama)
+[setup:offline] model cache (deepseek-r1:14b): OK
+[setup:offline] all artifacts present — ready to run
+== throughput probe (raw ollama, no harness)
+[bootstrap] starting ollama serve
+[bootstrap] pulling deepseek-r1:14b
+Error: could not connect to ollama server, run 'ollama serve' to start it
+[bootstrap] FATAL: pull failed. If this node has no internet, pre-stage the
+[bootstrap] model from a login node: bash scripts/setup.sh --download

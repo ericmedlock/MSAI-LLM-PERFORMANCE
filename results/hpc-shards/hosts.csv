@@ -1,0 +1,5 @@
+host_id,hostname,environment,runtime,chip,machine_model,cpu_cores,total_ram_gb,gpu_model,gpu_cores,total_vram_gb,unified_memory,os,python,provider,base_url,backend_model,judge_model,config_hash
+1479c6549d69,str-gpu18.charlotte.edu,hpc,cuda,x86_64,,32,250,NVIDIA A40,,45,False,Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34,3.12.3,ollama,http://127.0.0.1:38405,deepseek-r1:14b,llama-3.2-3b-instruct,2bdbb6952605c7ca
+d855988d1a23,str-gpu20.charlotte.edu,hpc,cuda,x86_64,,32,250,NVIDIA A40,,45,False,Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34,3.12.3,ollama,http://127.0.0.1:38794,deepseek-r1:14b,llama-3.2-3b-instruct,2bdbb6952605c7ca
+857f2acf7c18,str-gpu16.charlotte.edu,hpc,cuda,x86_64,,32,250,NVIDIA A40,,45,False,Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34,3.12.3,ollama,http://127.0.0.1:38397,deepseek-r1:14b,llama-3.2-3b-instruct,2bdbb6952605c7ca
+e9ee5726d1d1,str-gpu17.charlotte.edu,hpc,cuda,x86_64,,32,250,NVIDIA A40,,45,False,Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34,3.12.3,ollama,http://127.0.0.1:38900,deepseek-r1:14b,llama-3.2-3b-instruct,2bdbb6952605c7ca
