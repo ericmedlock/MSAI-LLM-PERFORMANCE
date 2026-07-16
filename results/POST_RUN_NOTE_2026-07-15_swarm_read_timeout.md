@@ -2,7 +2,7 @@
 
 **Raised:** 2026-07-16, on review of the frontier-v2.1 15-way A40 sharded array.
 **Run:** SLURM job **26318397**, array `0-14`, ran 2026-07-15 17:45 → 22:51 UTC.
-**Data:** `results/hpc-shards/frontier-v2.1-hpc-14b-{monolithic,agentic,swarm}-t{1..5}.jsonl`
+**Data:** `results-HPC/hpc-shards/frontier-v2.1-hpc-14b-{monolithic,agentic,swarm}-t{1..5}.jsonl`
 **Config:** `config_hash = 2bdbb6952605c7ca`, `deepseek-r1-14b-distill-q4_k_m`, NVIDIA A40, Ollama.
 **Status:** 🔴 **OPEN — the swarm cell is unusable and must be re-run.** Monolithic and agentic
 are complete, clean, and unaffected.
@@ -114,7 +114,7 @@ analytically.
 2. Delete the 5 swarm shard files first — the harness resumes at row level and the failed
    rows are already written, so it would otherwise skip them as present:
    ```bash
-   rm results/hpc-shards/frontier-v2.1-hpc-14b-swarm-t{1..5}.jsonl
+   rm results-HPC/hpc-shards/frontier-v2.1-hpc-14b-swarm-t{1..5}.jsonl
    ```
 3. Re-run swarm only (array elements 10–14):
    ```bash

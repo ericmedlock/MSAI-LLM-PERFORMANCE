@@ -77,8 +77,8 @@ cross-platform comparison; see §5 for that as a separate experiment).
   (it already includes trial_idx). Add a unit test (see `tests/test_runner.py`
   for the pattern).
 - **File discipline: one writer per file.** Each shard writes its own OUT
-  (`results/hpc-shards/frontier-v2.1-hpc-14b-<backend>-t<t>.jsonl`), then concatenate
-  into the canonical `results/frontier-v2.1-hpc-14b-n5.jsonl` after validation
+  (`results-HPC/hpc-shards/frontier-v2.1-hpc-14b-<backend>-t<t>.jsonl`), then concatenate
+  into the canonical `results-HPC/frontier-v2.1-hpc-14b-n5.jsonl` after validation
   (540 rows, no dupes on (task,backend,trial), single config hash, power non-null).
   Old-epoch HPC files keep their existing names — if anything collides, follow the
   M4 rename convention (`*-DETERMINISTIC-N-temp0.jsonl` suffix on the OLD file).

@@ -8,7 +8,7 @@
 #   sbatch scripts/job_frontier_a40.sbatch
 #
 # Scaling legs reuse this script with overrides at submit time, e.g.:
-#   sbatch --export=ALL,LLM_MODEL=deepseek-r1:32b,MODEL_TAG=deepseek-r1-distill-qwen-32b,TRIALS=2,OUT_PREFIX=results/frontier-v2.1-hpc-32b \
+#   sbatch --export=ALL,LLM_MODEL=deepseek-r1:32b,MODEL_TAG=deepseek-r1-distill-qwen-32b,TRIALS=2,OUT_PREFIX=results-HPC/frontier-v2.1-hpc-32b \
 #          scripts/job_frontier_a40.sbatch
 #
 # Requeue/timeout safe: the harness resumes at row level, so a requeued array
@@ -29,7 +29,7 @@ cd "${SLURM_SUBMIT_DIR:?run via sbatch from the repo root}"
 
 BACKENDS=(monolithic agentic swarm)
 BACKEND="${BACKENDS[$SLURM_ARRAY_TASK_ID]}"
-export OUT="${OUT_PREFIX:-results/frontier-v2.1-hpc-14b}-${BACKEND}.jsonl"
+export OUT="${OUT_PREFIX:-results-HPC/frontier-v2.1-hpc-14b}-${BACKEND}.jsonl"
 
 echo "== node: $(hostname)  job: ${SLURM_JOB_ID}  backend: ${BACKEND}"
 nvidia-smi -L || true

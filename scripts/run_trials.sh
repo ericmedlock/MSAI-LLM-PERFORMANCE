@@ -30,7 +30,7 @@ fi
 MANIFEST="${MANIFEST:-tasks/frontier_v2_1_manifest.json}"
 case "$PROFILE" in
   shadow) ENVKEY=shadow; DEF_TRIALS=1; DEF_OUT="results/frontier-v2.1-shadow-trial-14b.jsonl" ;;
-  hpc)    ENVKEY=hpc;    DEF_TRIALS=5; DEF_OUT="results/frontier-v2.1-hpc-14b.jsonl" ;;
+  hpc)    ENVKEY=hpc;    DEF_TRIALS=5; DEF_OUT="results-HPC/frontier-v2.1-hpc-14b.jsonl" ;;  # HPC data is isolated in results-HPC/ (see its README)
   local)  ENVKEY=local;  DEF_TRIALS=5; DEF_OUT="results/frontier-v2.1-local-14b.jsonl" ;;
   *) echo "[trials] unknown profile '$PROFILE' (use shadow|hpc|local|auto)"; exit 1 ;;
 esac
@@ -119,4 +119,4 @@ echo "[trials] launching (resumable; Ctrl-C safe)"
     --trials "$TRIALS" --output "$OUT" "$@"
 
 echo "[trials] done; rows:"; wc -l "$OUT"
-echo "[trials] next: commit the results JSONL + results/host/${ENVKEY}.json and push"
+echo "[trials] next: commit the results JSONL + $(dirname "$OUT")/host/${ENVKEY}.json and push"
