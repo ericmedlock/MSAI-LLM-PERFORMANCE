@@ -33,6 +33,19 @@ class RunPlan:
     backends: list[str]
     tasks: list[Task]
     trials: int
+    # Run exactly ONE trial index (shard-parallel HPC runs). Seeds derive from
+    # the trial index (config.trial_seed), so a slice reproduces the same seeds
+    # as the corresponding trial of a full run — logistics, not pinned science.
+    trial_only: Optional[int] = None
+
+    def trial_indices(self) -> list[int]:
+        if self.trial_only is not None:
+            if not 1 <= self.trial_only <= self.trials:
+                raise ValueError(
+                    f"trial_only={self.trial_only} outside 1..{self.trials}"
+                )
+            return [self.trial_only]
+        return list(range(1, self.trials + 1))
 
 
 def _now_iso(clock: Callable[[], float]) -> str:
@@ -113,7 +126,7 @@ class Runner:
         for task in plan.tasks:
             for backend_name in plan.backends:
                 backend = backends[backend_name]
-                for trial_idx in range(1, plan.trials + 1):
+                for trial_idx in plan.trial_indices():
                     key = (task.task_id, backend_name, plan.environment, trial_idx)
                     if key in done:
                         continue

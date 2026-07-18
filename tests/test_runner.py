@@ -128,3 +128,38 @@ def test_trial_seed_is_stamped_on_every_row(config, prompts, tmp_path):
     rows = [json.loads(l) for l in out.read_text().splitlines()]
     assert [r["metadata"]["trial_seed"] for r in rows] == [config.trial_seed(1), config.trial_seed(2)]
     assert all(r["metadata"]["trial_seed_strategy"] == "offset" for r in rows)
+
+
+def test_trial_only_runs_exactly_one_trial_with_matching_seed(config, prompts, tmp_path, monkeypatch):
+    # --trial t must run only trial t AND use the same seed a full run would
+    # use for that trial (shard == slice of the full grid, resume-compatible).
+    import harness.hostinfo as hostinfo
+
+    monkeypatch.setattr(hostinfo, "_loaded_models", lambda provider, base_url: ["m1"])
+    seen_seeds = []
+
+    def responder(system, user, seed=None):
+        seen_seeds.append(seed)
+        return "72"
+
+    out = tmp_path / "slice.jsonl"
+    runner = _runner(config, prompts, responder)
+    runner.run_plan(
+        RunPlan("local", ["monolithic"], TASKS[:1], trials=5, trial_only=3), out
+    )
+    rows = [json.loads(l) for l in open(out)]
+    assert len(rows) == 1
+    assert seen_seeds == [config.trial_seed(3)]
+
+    # a follow-up FULL run over the same file must skip the sharded trial
+    runner2 = _runner(config, prompts, responder)
+    runner2.run_plan(RunPlan("local", ["monolithic"], TASKS[:1], trials=5), out)
+    rows = [json.loads(l) for l in open(out)]
+    assert len(rows) == 5  # trials 1,2,4,5 added; trial 3 resumed, not re-run
+
+
+def test_trial_only_out_of_range_raises(config, prompts):
+    import pytest
+
+    with pytest.raises(ValueError):
+        RunPlan("local", ["monolithic"], TASKS[:1], trials=5, trial_only=6).trial_indices()

@@ -42,6 +42,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="restrict to specific task id(s) (repeatable); default: all tasks",
     )
     p.add_argument("--trials", type=int, help="override N trials (default: config trials.n)")
+    p.add_argument(
+        "--trial",
+        type=int,
+        help="run exactly ONE trial index (1..N) — shard-parallel HPC runs; "
+        "seeds derive from the index so a slice matches the full run",
+    )
     p.add_argument("--output", help="output JSONL path (default: results/<env>.jsonl)")
     p.add_argument(
         "--dry-run",
@@ -73,9 +79,17 @@ def main(argv: list[str] | None = None) -> int:
         tasks = all_tasks
 
     output = args.output or str(Path(config.results_dir) / f"{environment}.jsonl")
-    plan = RunPlan(environment=environment, backends=backends, tasks=tasks, trials=trials)
+    plan = RunPlan(
+        environment=environment, backends=backends, tasks=tasks, trials=trials,
+        trial_only=args.trial,
+    )
+    try:
+        trial_indices = plan.trial_indices()
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
-    total = len(tasks) * len(backends) * trials
+    total = len(tasks) * len(backends) * len(trial_indices)
     env = config.env(environment).resolved()
     print(f"Environment : {environment} ({env.name})")
     print(f"Provider    : {env.provider} @ {env.base_url}")
@@ -84,7 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Backends    : {', '.join(backends)}")
     tiers = sorted({t.tier for t in tasks})
     print(f"Tasks       : {len(tasks)}  (tier: {', '.join(tiers)})")
-    print(f"Trials (N)  : {trials}")
+    print(f"Trials (N)  : {trials}"
+          + (f"  [SLICE: trial {args.trial} only]" if args.trial else ""))
     print(f"Total cells : {total} runs -> {output}")
 
     if args.dry_run:
