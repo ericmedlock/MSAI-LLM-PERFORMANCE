@@ -196,3 +196,4 @@ output/
 # rebase checkout clobbered a live tracked output file; add with -f when done)
 results/frontier-v2.1-local-14b.jsonl
 logs/
+*.POISONED-B6.*
