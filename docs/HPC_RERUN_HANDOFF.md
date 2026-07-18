@@ -1,5 +1,40 @@
 # HPC re-run handoff — amended-config confirmatory cell (for the Claude session driving Starlight)
 
+## ⚡ 2026-07-17 STATUS ADDENDUM — only the SWARM re-run remains (do this today)
+
+Mono + agentic shards are complete and validated. M5's 540-row cell is done
+(epoch-2 headline: agentic 57.8% > swarm 55.6% > mono 50.0%, F11). The one data
+debt is the swarm cell, poisoned by B6 read-timeouts (65/180 `backend_exception`;
+see `results/POST_RUN_NOTE_2026-07-15_swarm_read_timeout.md`).
+
+**Exact steps:**
+
+1. `git pull` (need ≥ `ebdbae6`).
+2. **Export `LLM_TIMEOUT_S=1800` in the sbatch environment** — this is the entire
+   fix (bug B6: peers queue on `OLLAMA_NUM_PARALLEL=1` and burn the 600 s client
+   default while waiting; the M4 `.env` has used 1800 since 07-13). Keep
+   `OLLAMA_NUM_PARALLEL=1` — peer queueing on one device is the pinned serving
+   topology, matched to M5/M4.
+3. **Quarantine the poisoned shards first** — the runner's row-resume SKIPS any
+   existing (task, backend, trial) key, including `backend_exception` rows, so a
+   re-run over the old files would keep every poisoned row. Rename
+   `results-HPC/hpc-shards/frontier-v2.1-hpc-14b-swarm-t{1..5}.jsonl` to
+   `*.POISONED-B6` (git history already preserves them) and run fresh.
+4. Re-submit ONLY the 5 swarm shards (array 10–14 or equivalent): ~1 h on 5 A40s.
+5. Validate: 36 rows/shard, **zero** `backend_exception`, hash `2bdbb6952605c7ca`,
+   seeds 1042…5042, `gpu_power_w` non-null, `verdict_mode` n/a (swarm).
+6. Merge all 15 clean shards → `results-HPC/frontier-v2.1-hpc-14b-n5.jsonl`
+   (540 rows, dedupe check on (task, backend, trial)).
+7. *(If time)* the §11.3 A40 throughput anomaly is still unexplained (17.5 tok/s
+   at 83% util vs A4500's 37.7) — at minimum record ollama version + serve flags
+   + `num_ctx` into eng log §11.3 so the energy numbers can be caveated precisely.
+8. Expectation check: valid-row swarm accuracy on the poisoned cell read 72.2%,
+   but that's survivorship-biased upward (timeouts killed the slowest = hardest
+   rows). M5 swarm epoch-2 = 55.6%. If your clean number lands well above M5's,
+   verify before celebrating.
+
+*(Original mission brief below, for context.)*
+
 **Written 2026-07-15 by the M5-side session.** Your mission: regenerate the HPC
 confirmatory cell (36 tasks × 3 architectures × N=5 = 540 rows) under the
 **amended config**, sharded across as many A40s as the cluster will give you, then
