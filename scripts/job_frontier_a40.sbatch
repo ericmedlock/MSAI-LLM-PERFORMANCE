@@ -30,6 +30,9 @@ cd "${SLURM_SUBMIT_DIR:?run via sbatch from the repo root}"
 BACKENDS=(monolithic agentic swarm)
 BACKEND="${BACKENDS[$SLURM_ARRAY_TASK_ID]}"
 export OUT="${OUT_PREFIX:-results-HPC/frontier-v2.1-hpc-14b}-${BACKEND}.jsonl"
+# Bug B6 (POST_RUN_NOTE 2026-07-15): swarm peers queue on OLLAMA_NUM_PARALLEL=1
+# and burn the 600 s client default while waiting; 65/180 rows died. Match M4.
+export LLM_TIMEOUT_S="${LLM_TIMEOUT_S:-1800}"
 
 echo "== node: $(hostname)  job: ${SLURM_JOB_ID}  backend: ${BACKEND}"
 nvidia-smi -L || true
