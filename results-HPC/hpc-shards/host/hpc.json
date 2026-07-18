@@ -1,6 +1,6 @@
 {
-  "host_id": "857f2acf7c18",
-  "hostname": "str-gpu16.charlotte.edu",
+  "host_id": "ccb3fbe43385",
+  "hostname": "str-gpu15.charlotte.edu",
   "environment": "hpc",
   "runtime": "cuda",
   "os": "Linux-5.14.0-570.49.1.el9_6.x86_64-x86_64-with-glibc2.34",
@@ -18,7 +18,7 @@
   },
   "serving": {
     "provider": "ollama",
-    "base_url": "http://127.0.0.1:38397",
+    "base_url": "http://127.0.0.1:36695",
     "backend_model": "deepseek-r1:14b",
     "judge_model": "llama-3.2-3b-instruct",
     "models_available": [
@@ -26,5 +26,5 @@
     ]
   },
   "config_hash": "2bdbb6952605c7ca",
-  "captured_at": "2026-07-15T19:17:42.544750+00:00"
+  "captured_at": "2026-07-18T10:27:58.759490+00:00"
 }
