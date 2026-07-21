@@ -80,12 +80,13 @@ def test_build_client_honors_dotenv_override(config, monkeypatch):
 
 
 def test_build_client_timeout_override(config, monkeypatch):
-    # Read timeout defaults to 600s but is overridable per-machine: slow boxes
-    # (14B reasoning model at ~10 tok/s) need >600s for a full max_tokens turn,
+    # Read timeout defaults to 1800s (raised 2026-07-21, A40 brief §4: worst
+    # pre-registered row runs 495-741s/attempt; queued swarm peers wait behind
+    # it) and is overridable per-machine: slow boxes
     # else long turns silently become backend_exception timeouts.
     for var in ("LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_S"):
         monkeypatch.delenv(var, raising=False)
-    assert build_client(config, "local").timeout_s == 600.0
+    assert build_client(config, "local").timeout_s == 1800.0
     monkeypatch.setenv("LLM_TIMEOUT_S", "1800")
     assert build_client(config, "local").timeout_s == 1800.0
 

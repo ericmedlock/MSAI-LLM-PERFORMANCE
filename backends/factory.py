@@ -63,12 +63,12 @@ def _make_client(
     """Construct a provider client. Concrete HTTP clients are imported lazily
     so offline tests never require them.
 
-    ``LLM_TIMEOUT_S`` overrides the per-request read timeout (default 600 s). It
+    ``LLM_TIMEOUT_S`` overrides the per-request read timeout (default 1800 s; A40 brief &sect;4). It
     is a machine/hardware concern, NOT a pinned scientific parameter: slow boxes
     (e.g. a 14B reasoning model on Apple Metal at ~10 tok/s) can need >600 s to
     emit a full ``max_tokens`` generation, so a fixed 600 s silently turns long
     reasoning turns into ``backend_exception`` timeouts."""
-    timeout_s = float(os.environ.get("LLM_TIMEOUT_S", "600"))
+    timeout_s = float(os.environ.get("LLM_TIMEOUT_S", "1800"))
     if provider == "ollama":
         from backends.llm_client import OllamaClient
 

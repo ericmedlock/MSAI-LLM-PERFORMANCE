@@ -91,3 +91,64 @@ def test_integration_reachability_probe_is_provider_correct(monkeypatch):
 
     monkeypatch.setattr(llm.requests, "get", boom)
     assert _reachable(SimpleNamespace(provider="ollama", base_url="http://h:11434")) is False
+
+
+# -- transport retry hardening (A40 brief §4, 2026-07-21) -------------------- #
+def _flaky_post(script, captured_sleeps):
+    """Return a fake requests.post that plays through `script` — each entry is
+    an Exception instance to raise or an int status code to return."""
+    calls = {"n": 0}
+
+    def fake_post(url, json=None, timeout=None, headers=None):
+        step = script[calls["n"]]
+        calls["n"] += 1
+        if isinstance(step, Exception):
+            raise step
+
+        class R:
+            status_code = step
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return {"message": {"content": "ok"}, "prompt_eval_count": 1, "eval_count": 2}
+        return R()
+
+    return fake_post, calls
+
+
+def _client():
+    return OllamaClient(endpoint="http://x", model_tag="m",
+                        temperature=0.6, num_ctx=8192, max_tokens=6144, seed=42)
+
+
+def test_retry_recovers_from_transient_connection_errors(monkeypatch):
+    sleeps = []
+    fake, calls = _flaky_post(
+        [llm.requests.ConnectionError(), llm.requests.ConnectionError(), 200], sleeps)
+    monkeypatch.setattr(llm.requests, "post", fake)
+    monkeypatch.setattr(llm.time, "sleep", sleeps.append)
+    assert _client().chat("s", "u").text == "ok"
+    assert calls["n"] == 3 and sleeps == [5.0, 15.0]
+
+
+def test_retry_recovers_from_one_timeout_but_not_two(monkeypatch):
+    sleeps = []
+    fake, calls = _flaky_post([llm.requests.Timeout(), 200], sleeps)
+    monkeypatch.setattr(llm.requests, "post", fake)
+    monkeypatch.setattr(llm.time, "sleep", sleeps.append)
+    assert _client().chat("s", "u").text == "ok"      # one timeout: retried
+
+    fake2, _ = _flaky_post([llm.requests.Timeout(), llm.requests.Timeout()], sleeps)
+    monkeypatch.setattr(llm.requests, "post", fake2)
+    import pytest
+    with pytest.raises(llm.requests.Timeout):          # second timeout: raises,
+        _client().chat("s", "u")                       # runner records the row
+
+
+def test_retry_recovers_from_transient_5xx(monkeypatch):
+    sleeps = []
+    fake, calls = _flaky_post([503, 200], sleeps)
+    monkeypatch.setattr(llm.requests, "post", fake)
+    monkeypatch.setattr(llm.time, "sleep", sleeps.append)
+    assert _client().chat("s", "u").text == "ok"
+    assert calls["n"] == 2
